@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.11";
+var CARD_VERSION = "0.2.12";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -327,7 +327,9 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         return;
       }
       if (action === "dial") {
-        element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, element));
+        const svg = element;
+        element.addEventListener("touchstart", (event) => this.handleDialTouch(event, svg), { passive: false });
+        element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, svg));
         return;
       }
       element.addEventListener("click", () => this.handleAction(element));
@@ -413,40 +415,40 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       this.clearPendingSettings();
     }, 900);
   }
+  temperatureFromClient(svg, clientX, clientY, minTemp, maxTemp, step) {
+    const rect = svg.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width * 320;
+    const y = (clientY - rect.top) / rect.height * 320;
+    let degrees = Math.atan2(y - DIAL_CENTER, x - DIAL_CENTER) * 180 / Math.PI;
+    if (degrees < 0) degrees += 360;
+    if (degrees < DIAL_START_DEGREES) degrees += 360;
+    const percent = Math.min(1, Math.max(0, (degrees - DIAL_START_DEGREES) / DIAL_SWEEP_DEGREES));
+    const raw = minTemp + percent * (maxTemp - minTemp);
+    const snapped = Math.round(raw / step) * step;
+    return Math.min(maxTemp, Math.max(minTemp, snapped));
+  }
+  previewDialTemperature(svg, temperature, minTemp, maxTemp, unit) {
+    const percent = Math.min(1, Math.max(0, (temperature - minTemp) / Math.max(maxTemp - minTemp, 1)));
+    const thumbPoint = dialPoint(percent);
+    svg.querySelector(".dial-progress")?.setAttribute("stroke-dasharray", `${Math.round(DIAL_ARC_LENGTH * percent)} ${DIAL_ARC_LENGTH}`);
+    const thumb = svg.querySelector(".dial-thumb");
+    thumb?.setAttribute("cx", String(thumbPoint.x));
+    thumb?.setAttribute("cy", String(thumbPoint.y));
+    const target = this.querySelector('[data-role="target-temp"]');
+    if (target) target.textContent = formatTemperature(temperature, unit);
+  }
   handleDialPointer(event, svg) {
     const climate = this.climate;
-    if (!climate) return;
+    if (!climate || this._isDraggingDial) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const minTemp = numericAttribute(climate, "min_temp", 16);
     const maxTemp = numericAttribute(climate, "max_temp", 30);
     const step = numericAttribute(climate, "target_temp_step", 1);
     const unit = climate.attributes.temperature_unit ?? "\xB0C";
-    const preview = (temperature) => {
-      const percent = Math.min(1, Math.max(0, (temperature - minTemp) / Math.max(maxTemp - minTemp, 1)));
-      const thumbPoint = dialPoint(percent);
-      svg.querySelector(".dial-progress")?.setAttribute("stroke-dasharray", `${Math.round(DIAL_ARC_LENGTH * percent)} ${DIAL_ARC_LENGTH}`);
-      const thumb = svg.querySelector(".dial-thumb");
-      thumb?.setAttribute("cx", String(thumbPoint.x));
-      thumb?.setAttribute("cy", String(thumbPoint.y));
-      const target = this.querySelector('[data-role="target-temp"]');
-      if (target) target.textContent = formatTemperature(temperature, unit);
-    };
-    const temperatureFromPointer = (pointer) => {
-      const rect = svg.getBoundingClientRect();
-      const x = (pointer.clientX - rect.left) / rect.width * 320;
-      const y = (pointer.clientY - rect.top) / rect.height * 320;
-      let degrees = Math.atan2(y - DIAL_CENTER, x - DIAL_CENTER) * 180 / Math.PI;
-      if (degrees < 0) degrees += 360;
-      if (degrees < DIAL_START_DEGREES) degrees += 360;
-      const percent = Math.min(1, Math.max(0, (degrees - DIAL_START_DEGREES) / DIAL_SWEEP_DEGREES));
-      const raw = minTemp + percent * (maxTemp - minTemp);
-      const snapped = Math.round(raw / step) * step;
-      return Math.min(maxTemp, Math.max(minTemp, snapped));
-    };
     const update = (pointer) => {
-      pendingTemperature = temperatureFromPointer(pointer);
+      pendingTemperature = this.temperatureFromClient(svg, pointer.clientX, pointer.clientY, minTemp, maxTemp, step);
       this._dragTemperature = pendingTemperature;
-      window.requestAnimationFrame(() => preview(pendingTemperature));
+      window.requestAnimationFrame(() => this.previewDialTemperature(svg, pendingTemperature, minTemp, maxTemp, unit));
     };
     event.preventDefault();
     this._isDraggingDial = true;
@@ -470,6 +472,54 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     svg.addEventListener("pointermove", move);
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
+  }
+  handleDialTouch(event, svg) {
+    const climate = this.climate;
+    const touch = event.changedTouches[0];
+    if (!climate || !touch || this._isDraggingDial) return;
+    let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
+    const touchId = touch.identifier;
+    const minTemp = numericAttribute(climate, "min_temp", 16);
+    const maxTemp = numericAttribute(climate, "max_temp", 30);
+    const step = numericAttribute(climate, "target_temp_step", 1);
+    const unit = climate.attributes.temperature_unit ?? "\xB0C";
+    const touchById = (touches) => {
+      for (let i = 0; i < touches.length; i += 1) {
+        const candidate = touches.item(i);
+        if (candidate?.identifier === touchId) return candidate;
+      }
+      return void 0;
+    };
+    const update = (touchPoint) => {
+      pendingTemperature = this.temperatureFromClient(svg, touchPoint.clientX, touchPoint.clientY, minTemp, maxTemp, step);
+      this._dragTemperature = pendingTemperature;
+      window.requestAnimationFrame(() => this.previewDialTemperature(svg, pendingTemperature, minTemp, maxTemp, unit));
+    };
+    event.preventDefault();
+    this._isDraggingDial = true;
+    this._dragTemperature = pendingTemperature;
+    update(touch);
+    const move = (moveEvent) => {
+      const activeTouch = touchById(moveEvent.changedTouches) ?? touchById(moveEvent.touches);
+      if (!activeTouch) return;
+      moveEvent.preventDefault();
+      update(activeTouch);
+    };
+    const stop = (endEvent) => {
+      const activeTouch = touchById(endEvent.changedTouches);
+      if (!activeTouch && endEvent.type !== "touchcancel") return;
+      endEvent.preventDefault();
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", stop);
+      window.removeEventListener("touchcancel", stop);
+      this._isDraggingDial = false;
+      this._dragTemperature = void 0;
+      this.setTargetTemperature(pendingTemperature);
+      this.render();
+    };
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", stop, { passive: false });
+    window.addEventListener("touchcancel", stop, { passive: false });
   }
   setTargetTemperature(temperature) {
     if (!this._hass || !this._config || !Number.isFinite(temperature)) return;
@@ -664,8 +714,8 @@ var styles = `
   .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
-  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; }
-  .dial { width: 100%; height: 100%; overflow: visible; }
+  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .dial { width: 100%; height: 100%; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
   .dial-hit { stroke: transparent; stroke-width: 58; cursor: pointer; touch-action: none; }
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
