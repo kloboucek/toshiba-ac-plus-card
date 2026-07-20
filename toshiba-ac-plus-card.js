@@ -490,6 +490,9 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     if (!climate || !touch || this._isDraggingDial || !this.isClientOnDialArc(svg, touch.clientX, touch.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const touchId = touch.identifier;
+    const startClientX = touch.clientX;
+    const startClientY = touch.clientY;
+    let dialGestureStarted = false;
     const minTemp = numericAttribute(climate, "min_temp", 16);
     const maxTemp = numericAttribute(climate, "max_temp", 30);
     const step = numericAttribute(climate, "target_temp_step", 1);
@@ -501,28 +504,51 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       }
       return void 0;
     };
+    const cleanup = () => {
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", stop);
+      window.removeEventListener("touchcancel", stop);
+    };
+    const startDialGesture = (touchPoint) => {
+      dialGestureStarted = true;
+      this._isDraggingDial = true;
+      this._dragTemperature = pendingTemperature;
+      update(touchPoint);
+    };
     const update = (touchPoint) => {
       pendingTemperature = this.temperatureFromClient(svg, touchPoint.clientX, touchPoint.clientY, minTemp, maxTemp, step);
       this._dragTemperature = pendingTemperature;
       window.requestAnimationFrame(() => this.previewDialTemperature(svg, pendingTemperature, minTemp, maxTemp, unit));
     };
-    event.preventDefault();
-    this._isDraggingDial = true;
-    this._dragTemperature = pendingTemperature;
-    update(touch);
     const move = (moveEvent) => {
       const activeTouch = touchById(moveEvent.changedTouches) ?? touchById(moveEvent.touches);
       if (!activeTouch) return;
+      if (!dialGestureStarted) {
+        const deltaX = activeTouch.clientX - startClientX;
+        const deltaY = activeTouch.clientY - startClientY;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        if (absY > 8 && absY > absX * 1.15) {
+          cleanup();
+          return;
+        }
+        if (Math.max(absX, absY) < 8) return;
+        startDialGesture(activeTouch);
+      }
       moveEvent.preventDefault();
       update(activeTouch);
     };
     const stop = (endEvent) => {
       const activeTouch = touchById(endEvent.changedTouches);
       if (!activeTouch && endEvent.type !== "touchcancel") return;
+      cleanup();
+      if (endEvent.type === "touchcancel") {
+        this._isDraggingDial = false;
+        this._dragTemperature = void 0;
+        return;
+      }
+      if (!dialGestureStarted && activeTouch) startDialGesture(activeTouch);
       endEvent.preventDefault();
-      window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", stop);
-      window.removeEventListener("touchcancel", stop);
       this._isDraggingDial = false;
       this._dragTemperature = void 0;
       this.setTargetTemperature(pendingTemperature);
@@ -725,10 +751,10 @@ var styles = `
   .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
-  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .dial { width: 100%; height: 100%; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .dial { width: 100%; height: 100%; overflow: visible; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
-  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; touch-action: none; }
+  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; touch-action: pan-y; }
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }

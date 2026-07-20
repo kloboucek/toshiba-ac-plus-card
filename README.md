@@ -143,4 +143,4 @@ cards:
 - When the climate entity is off, Preset, Fan mode, and Swing mode selections are held locally and persisted in browser localStorage per climate entity. They survive dashboard switches/page refreshes in the same browser and are applied only after the user turns the AC on via the main Mode dropdown.
 - The visual config editor keeps HA entity pickers mounted during live HA updates, so the climate/timer search dropdowns stay stable while typing.
 - When the selected climate entity changes in the visual editor, the default card name follows the new entity unless the name was manually customized.
-- The thermostat dial supports both pointer and touch drag handling, with page scrolling disabled while dragging on mobile. Dragging now only starts from the visible slider arc/hit band, so taps outside the ring are ignored.
+- The thermostat dial supports both pointer and touch drag handling. On mobile, vertical swipes over the dial/arc are left to the dashboard page for scrolling; the card only captures confirmed dial drags or taps on the visible slider arc.
