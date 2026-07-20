@@ -139,3 +139,4 @@ cards:
 - This card does not install or configure the Toshiba AC Community integration.
 - Some Toshiba feature entities are unavailable when the AC is off or in an incompatible mode. The card greys those controls out.
 - If entity names differ from the auto-detected pattern, configure the feature entities manually.
+- Mode, Preset, Fan mode, and Swing mode are styled in-card dropdown menus instead of native browser selects.

@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.2";
+var CARD_VERSION = "0.2.3";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var FEATURE_LABELS = {
@@ -23,6 +23,10 @@ function hasEntity(hass, entityId) {
 }
 function titleCase(value) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function escapeHtml(value) {
+  const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+  return value.replace(/[&<>"]/g, (char) => map[char] ?? char);
 }
 function objectId(entityId) {
   return entityId.split(".")[1] ?? entityId;
@@ -125,26 +129,27 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     const maxTemp = numericAttribute(entity, "max_temp", 30);
     const range = Math.max(maxTemp - minTemp, 1);
     const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
-    const dash = Math.round(390 * percent);
+    const arcLength = 500;
+    const dash = Math.round(arcLength * percent);
     const angle = (143 + percent * 254) * Math.PI / 180;
-    const thumbX = 130 + 92 * Math.cos(angle);
-    const thumbY = 130 + 92 * Math.sin(angle);
+    const thumbX = 160 + 118 * Math.cos(angle);
+    const thumbY = 160 + 118 * Math.sin(angle);
     const mode = titleCase(entity.state);
     return `
       <div class="thermostat-shell">
         <div class="current-label">Current temperature</div>
         <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
         <div class="dial-wrap">
-          <svg class="dial" viewBox="0 0 260 260" data-action="dial" aria-label="Drag or click to set target temperature">
-            <path class="dial-hit" d="M64 203 A92 92 0 1 1 196 203" />
-            <path class="dial-track" d="M64 203 A92 92 0 1 1 196 203" />
-            <path class="dial-progress" d="M64 203 A92 92 0 1 1 196 203" stroke-dasharray="${dash} 390" />
-            <circle class="dial-thumb" cx="${thumbX}" cy="${thumbY}" r="11" />
-            <circle class="dial-dot" cx="198" cy="90" r="3" />
+          <svg class="dial" viewBox="0 0 320 320" data-action="dial" aria-label="Drag or click to set target temperature">
+            <path class="dial-hit" d="M76 254 A118 118 0 1 1 244 254" />
+            <path class="dial-track" d="M76 254 A118 118 0 1 1 244 254" />
+            <path class="dial-progress" d="M76 254 A118 118 0 1 1 244 254" stroke-dasharray="${dash} ${arcLength}" />
+            <circle class="dial-thumb" cx="${thumbX}" cy="${thumbY}" r="13" />
+            <circle class="dial-dot" cx="247" cy="113" r="4" />
           </svg>
-          <div class="dial-center">
+          <div class="dial-center" data-role="dial-center" data-unit="${unit}" data-min="${minTemp}" data-max="${maxTemp}" data-step="${numericAttribute(entity, "target_temp_step", 1)}">
             <div class="mode-label">${mode}</div>
-            <div class="target-temp">${formatTemperature(target, unit)}</div>
+            <div class="target-temp" data-role="target-temp">${formatTemperature(target, unit)}</div>
           </div>
         </div>
         <div class="temp-buttons">
@@ -161,12 +166,9 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     }
     const timerState = this._hass?.states[timer.entity];
     const durations = timer.durations?.length ? timer.durations : DEFAULT_DURATIONS;
-    return `
-      <select class="tile timer-tile" data-action="timer" ${timerState ? "" : "disabled"}>
-        <option value="off">Off</option>
-        ${durations.map((minutes) => `<option value="${minutes}">${minutes} min</option>`).join("")}
-      </select>
-    `;
+    const options = ["off", ...durations.map((minutes) => String(minutes))];
+    const current = timerState?.state === "active" ? "active" : "off";
+    return this.renderDropdownTile("timer", "mdi:timer-outline", "Timer", current === "active" ? "Running" : "Off", options, timerState ? "" : "disabled");
   }
   renderControls() {
     const climate = this.climate;
@@ -193,14 +195,25 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   renderSelectTile(action, icon, label, value, options) {
     const safeOptions = options.length ? options : [value || "None"];
     const currentValue = value || safeOptions[0] || "";
+    return this.renderDropdownTile(action, icon, label, currentValue, safeOptions);
+  }
+  renderDropdownTile(action, icon, label, value, options, disabled = "") {
+    const display = value === "off" ? "Off" : value === "active" ? "Running" : value ? titleCase(value) : "None";
     return `
-      <label class="select-tile">
-        <ha-icon icon="${icon}"></ha-icon>
-        <span>${label}</span>
-        <select data-action="${action}">
-          ${safeOptions.map((option) => `<option value="${option}" ${option === currentValue ? "selected" : ""}>${option ? titleCase(option) : "None"}</option>`).join("")}
-        </select>
-      </label>
+      <details class="select-tile ${disabled}" data-dropdown>
+        <summary>
+          <ha-icon icon="${icon}"></ha-icon>
+          <span>${label}</span>
+          <strong>${escapeHtml(display)}</strong>
+        </summary>
+        <div class="select-menu">
+          ${options.map((option) => {
+      const optionLabel = action === "timer" && option !== "off" ? `${option} min` : option === "off" ? "Off" : option ? titleCase(option) : "None";
+      const selected = option === value || (action === "timer" && value === "active" && option !== "off" ? "" : "");
+      return `<button class="select-option ${selected ? "selected" : ""}" data-action="dropdownOption" data-select-action="${action}" data-value="${escapeHtml(option)}">${escapeHtml(optionLabel)}</button>`;
+    }).join("")}
+        </div>
+      </details>
     `;
   }
   renderFeatureTile(feature, entityId) {
@@ -221,12 +234,12 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   bindEvents() {
     this.querySelectorAll("[data-action]").forEach((element) => {
       const action = element.dataset.action;
-      if (element instanceof HTMLSelectElement) {
-        if (action === "timer") {
-          element.addEventListener("change", () => this.handleTimer(element));
-        } else {
-          element.addEventListener("change", () => this.handleSelect(element));
-        }
+      if (action === "dropdownOption") {
+        element.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.handleDropdownOption(element);
+        });
         return;
       }
       if (element instanceof HTMLInputElement && action === "temperature") {
@@ -240,11 +253,16 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       element.addEventListener("click", () => this.handleAction(element));
     });
   }
-  handleSelect(select) {
+  handleDropdownOption(element) {
     if (!this._hass || !this._config) return;
-    const value = select.value;
+    const value = element.dataset.value ?? "";
+    const action = element.dataset.selectAction;
+    element.closest("details")?.removeAttribute("open");
     if (!value) return;
-    const action = select.dataset.action;
+    if (action === "timer") {
+      this.handleTimerValue(value);
+      return;
+    }
     if (action === "hvacSelect") {
       this._hass.callService("climate", "set_hvac_mode", { hvac_mode: value }, { entity_id: this._config.entity });
       return;
@@ -264,21 +282,40 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   handleDialPointer(event, svg) {
     const climate = this.climate;
     if (!climate) return;
-    const update = (pointer) => {
+    let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
+    const minTemp = numericAttribute(climate, "min_temp", 16);
+    const maxTemp = numericAttribute(climate, "max_temp", 30);
+    const step = numericAttribute(climate, "target_temp_step", 1);
+    const unit = climate.attributes.temperature_unit ?? "\xB0C";
+    const preview = (temperature) => {
+      const percent = Math.min(1, Math.max(0, (temperature - minTemp) / Math.max(maxTemp - minTemp, 1)));
+      const angle = (143 + percent * 254) * Math.PI / 180;
+      const thumbX = 160 + 118 * Math.cos(angle);
+      const thumbY = 160 + 118 * Math.sin(angle);
+      svg.querySelector(".dial-progress")?.setAttribute("stroke-dasharray", `${Math.round(500 * percent)} 500`);
+      const thumb = svg.querySelector(".dial-thumb");
+      thumb?.setAttribute("cx", String(thumbX));
+      thumb?.setAttribute("cy", String(thumbY));
+      const target = this.querySelector('[data-role="target-temp"]');
+      if (target) target.textContent = formatTemperature(temperature, unit);
+    };
+    const temperatureFromPointer = (pointer) => {
       const rect = svg.getBoundingClientRect();
-      const x = (pointer.clientX - rect.left) / rect.width * 260;
-      const y = (pointer.clientY - rect.top) / rect.height * 260;
-      let degrees = Math.atan2(y - 130, x - 130) * 180 / Math.PI;
+      const x = (pointer.clientX - rect.left) / rect.width * 320;
+      const y = (pointer.clientY - rect.top) / rect.height * 320;
+      let degrees = Math.atan2(y - 160, x - 160) * 180 / Math.PI;
       if (degrees < 0) degrees += 360;
       if (degrees < 143) degrees += 360;
       const percent = Math.min(1, Math.max(0, (degrees - 143) / 254));
-      const minTemp = numericAttribute(climate, "min_temp", 16);
-      const maxTemp = numericAttribute(climate, "max_temp", 30);
-      const step = numericAttribute(climate, "target_temp_step", 1);
       const raw = minTemp + percent * (maxTemp - minTemp);
       const snapped = Math.round(raw / step) * step;
-      this.setTargetTemperature(Math.min(maxTemp, Math.max(minTemp, snapped)));
+      return Math.min(maxTemp, Math.max(minTemp, snapped));
     };
+    const update = (pointer) => {
+      pendingTemperature = temperatureFromPointer(pointer);
+      window.requestAnimationFrame(() => preview(pendingTemperature));
+    };
+    event.preventDefault();
     svg.setPointerCapture?.(event.pointerId);
     update(event);
     const move = (moveEvent) => update(moveEvent);
@@ -286,6 +323,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       svg.removeEventListener("pointermove", move);
       svg.removeEventListener("pointerup", stop);
       svg.removeEventListener("pointercancel", stop);
+      this.setTargetTemperature(pendingTemperature);
     };
     svg.addEventListener("pointermove", move);
     svg.addEventListener("pointerup", stop);
@@ -354,19 +392,16 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       }
     }
   }
-  handleTimer(select) {
+  handleTimerValue(value) {
     if (!this._hass || !this._config || !this._config.timer || !this._config.timer.entity) return;
     const entityId = this._config.timer.entity;
-    const value = select.value;
     if (value === "off" || value === "") {
       this._hass.callService("timer", "cancel", void 0, { entity_id: entityId });
-      select.value = "off";
       return;
     }
     const minutes = Number(value);
     if (Number.isFinite(minutes) && minutes > 0) {
       this._hass.callService("timer", "start", { duration: durationToTime(minutes) }, { entity_id: entityId });
-      select.value = "";
     }
   }
 };
@@ -435,7 +470,7 @@ var ToshibaAcPlusCardEditor = class extends HTMLElement {
 var styles = `
   ha-card.tap-card {
     border-radius: 24px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     background: var(--ha-card-background, var(--card-background-color));
     padding: 18px 18px 28px;
@@ -453,24 +488,24 @@ var styles = `
   .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
-  .dial-wrap { position: relative; width: min(300px, 82vw); height: 246px; margin-top: 8px; }
+  .dial-wrap { position: relative; width: min(360px, 90vw); height: 306px; margin-top: 4px; }
   .dial { width: 100%; height: 100%; overflow: visible; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
-  .dial-hit { stroke: transparent; stroke-width: 42; cursor: pointer; touch-action: none; }
-  .dial-track, .dial-progress { stroke-width: 18; pointer-events: none; }
+  .dial-hit { stroke: transparent; stroke-width: 58; cursor: pointer; touch-action: none; }
+  .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
   .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; pointer-events: none; }
   .dial-dot { fill: rgba(220,220,220,.65); }
   .dial-center {
     position: absolute;
-    inset: 78px 0 auto;
+    inset: 106px 0 auto;
     text-align: center;
     pointer-events: none;
   }
-  .mode-label { font-size: 15px; font-weight: 700; color: var(--secondary-text-color); margin-bottom: -16px; position: relative; top: -32px; }
+  .mode-label { font-size: 15px; font-weight: 700; color: var(--secondary-text-color); margin-bottom: 12px; position: relative; top: -44px; }
   .target-temp { font-size: 58px; font-weight: 300; line-height: .95; letter-spacing: -2px; }
-  .temp-buttons { display: flex; gap: 26px; margin-top: -38px; z-index: 1; }
+  .temp-buttons { display: flex; gap: 26px; margin-top: -50px; z-index: 1; }
   .round-button {
     width: 48px;
     height: 48px;
@@ -495,35 +530,59 @@ var styles = `
     box-shadow: none;
   }
   .select-tile {
-    display: grid;
-    grid-template-columns: 36px 1fr;
-    grid-template-areas: "icon label" "icon select";
-    align-items: center;
-    text-align: left;
-    padding: 9px 10px;
+    position: relative;
+    display: block;
+    padding: 0;
   }
+  .select-tile.disabled { opacity: .35; pointer-events: none; }
+  .select-tile summary {
+    display: grid;
+    grid-template-columns: 36px 1fr 18px;
+    grid-template-areas: "icon label chevron" "icon value chevron";
+    align-items: center;
+    min-height: 58px;
+    padding: 9px 10px;
+    list-style: none;
+  }
+  .select-tile summary::-webkit-details-marker { display: none; }
+  .select-tile summary::after { content: "\u2304"; grid-area: chevron; color: var(--secondary-text-color); justify-self: end; font-size: 16px; }
+  .select-tile[open] summary::after { transform: rotate(180deg); }
   .select-tile ha-icon { grid-area: icon; --mdc-icon-size: 17px; color: var(--primary-color, #42a5f5); justify-self: center; }
   .select-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
-  .select-tile select {
-    grid-area: select;
-    width: 100%;
+  .select-tile strong { grid-area: value; color: var(--primary-text-color); font-size: 14px; line-height: 1.1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .select-menu {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    display: grid;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid rgba(140,140,140,.22);
+    background: var(--ha-card-background, var(--card-background-color));
+    box-shadow: 0 10px 26px rgba(0,0,0,.35);
+  }
+  .select-option {
     border: 0;
-    outline: 0;
-    background: transparent;
+    border-radius: 10px;
+    background: rgba(120,120,120,.10);
     color: var(--primary-text-color);
-    font-size: 14px;
-    font-weight: 700;
-    min-width: 0;
+    min-height: 34px;
+    padding: 7px 9px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 650;
     cursor: pointer;
   }
-  .select-tile select option, .timer-tile option { color: #111; }
+  .select-option:hover, .select-option.selected { background: rgba(33,150,243,.24); }
   .tile.active ha-icon { color: var(--primary-color, #42a5f5); }
   .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; }
   .tile ha-icon { --mdc-icon-size: 22px; color: var(--secondary-text-color); }
   .tile span { font-size: 12px; line-height: 1.1; text-align: center; }
   .tile.active { background: rgba(33,150,243,.22); }
   .tile.disabled { opacity: .35; cursor: not-allowed; }
-  .timer-tile { width: 100%; padding: 0 8px; font-size: 13px; text-align: center; }
   .timer-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary-text-color); font-size: 12px; }
   .warning { margin-top: 14px; color: var(--error-color); }
 `;
