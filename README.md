@@ -1,5 +1,7 @@
 # Toshiba AC Plus Card
 
+![Toshiba AC Plus Card preview](assets/preview.svg)
+
 A Home Assistant Lovelace dashboard card for Toshiba AC units exposed through the Toshiba AC Community integration.
 
 It provides a compact climate card with practical extra controls:
