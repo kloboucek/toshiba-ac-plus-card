@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.3";
+const CARD_VERSION = "0.2.4";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const FEATURE_LABELS: Record<FeatureName, { name: string; icon: string }> = {
@@ -119,6 +119,9 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   set hass(hass: HomeAssistant) {
     this._hass = hass;
+    if (this.querySelector("details[open]")) {
+      return;
+    }
     this.render();
   }
 
@@ -305,6 +308,14 @@ class ToshibaAcPlusCard extends HTMLElement {
   }
 
   private bindEvents(): void {
+    this.querySelectorAll<HTMLDetailsElement>("details[data-dropdown]").forEach((details) => {
+      details.addEventListener("toggle", () => {
+        if (!details.open) return;
+        this.querySelectorAll<HTMLDetailsElement>("details[data-dropdown][open]").forEach((other) => {
+          if (other !== details) other.removeAttribute("open");
+        });
+      });
+    });
     this.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => {
       const action = element.dataset.action;
       if (action === "dropdownOption") {
@@ -622,7 +633,9 @@ const styles = `
     position: relative;
     display: block;
     padding: 0;
+    z-index: 1;
   }
+  .select-tile[open] { z-index: 50; }
   .select-tile.disabled { opacity: .35; pointer-events: none; }
   .select-tile summary {
     display: grid;
@@ -641,7 +654,7 @@ const styles = `
   .select-tile strong { grid-area: value; color: var(--primary-text-color); font-size: 14px; line-height: 1.1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .select-menu {
     position: absolute;
-    z-index: 10;
+    z-index: 100;
     left: 0;
     right: 0;
     top: calc(100% + 6px);
@@ -652,6 +665,10 @@ const styles = `
     border: 1px solid rgba(140,140,140,.22);
     background: var(--ha-card-background, var(--card-background-color));
     box-shadow: 0 10px 26px rgba(0,0,0,.35);
+  }
+  .extra-row .select-menu {
+    top: auto;
+    bottom: calc(100% + 6px);
   }
   .select-option {
     border: 0;
