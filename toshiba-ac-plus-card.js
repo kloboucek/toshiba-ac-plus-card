@@ -209,8 +209,8 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         <div class="current-label">Current temperature</div>
         <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
         <div class="dial-wrap">
-          <svg class="dial" viewBox="0 0 320 320" data-action="dial" aria-label="Drag or click to set target temperature">
-            <path class="dial-hit" d="${arcPath}" />
+          <svg class="dial" viewBox="0 0 320 320" aria-label="Drag or click to set target temperature">
+            <path class="dial-hit" d="${arcPath}" data-action="dial" />
             <path class="dial-track" d="${arcPath}" />
             <path class="dial-progress" d="${arcPath}" stroke-dasharray="${dash} ${DIAL_ARC_LENGTH}" />
             <circle class="dial-thumb" cx="${thumb.x}" cy="${thumb.y}" r="13" />
@@ -328,7 +328,8 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         return;
       }
       if (action === "dial") {
-        const svg = element;
+        const svg = element.closest("svg");
+        if (!svg) return;
         element.addEventListener("touchstart", (event) => this.handleDialTouch(event, svg), { passive: false });
         element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, svg));
         return;
@@ -450,6 +451,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
   handleDialPointer(event, svg) {
     const climate = this.climate;
+    if (event.pointerType === "touch") return;
     if (!climate || this._isDraggingDial || !this.isClientOnDialArc(svg, event.clientX, event.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const minTemp = numericAttribute(climate, "min_temp", 16);
@@ -752,9 +754,9 @@ var styles = `
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
   .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
-  .dial { width: 100%; height: 100%; overflow: visible; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .dial { width: 100%; height: 100%; overflow: visible; pointer-events: none; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
-  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; touch-action: pan-y; }
+  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; pointer-events: stroke; touch-action: pan-y; }
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
