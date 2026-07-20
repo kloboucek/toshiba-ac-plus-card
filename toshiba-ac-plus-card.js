@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.6";
+var CARD_VERSION = "0.2.7";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var DIAL_CENTER = 160;
@@ -135,7 +135,6 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         <div class="header">
           <div>
             <div class="title">${name}</div>
-            <div class="subtitle">${this._config.entity}</div>
           </div>
           <ha-icon icon="mdi:air-conditioner"></ha-icon>
         </div>

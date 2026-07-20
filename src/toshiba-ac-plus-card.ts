@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.6";
+const CARD_VERSION = "0.2.7";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 
@@ -197,7 +197,6 @@ class ToshibaAcPlusCard extends HTMLElement {
         <div class="header">
           <div>
             <div class="title">${name}</div>
-            <div class="subtitle">${this._config.entity}</div>
           </div>
           <ha-icon icon="mdi:air-conditioner"></ha-icon>
         </div>
