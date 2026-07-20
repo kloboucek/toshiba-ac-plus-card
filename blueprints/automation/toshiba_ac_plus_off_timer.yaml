@@ -1,0 +1,30 @@
+blueprint:
+  name: Toshiba AC Plus - turn off when timer finishes
+  description: Turn a climate entity off when a selected Home Assistant timer helper finishes.
+  domain: automation
+  input:
+    climate_entity:
+      name: Climate entity
+      description: The AC climate entity to turn off.
+      selector:
+        entity:
+          domain: climate
+    timer_entity:
+      name: Timer entity
+      description: The timer helper controlled by the Toshiba AC Plus Card.
+      selector:
+        entity:
+          domain: timer
+
+mode: single
+
+trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_entity
+
+action:
+  - service: climate.turn_off
+    target:
+      entity_id: !input climate_entity

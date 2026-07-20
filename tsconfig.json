@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noImplicitAny": true,
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "outDir": "build/types",
+    "declaration": false
+  },
+  "include": ["src/**/*.ts"]
+}

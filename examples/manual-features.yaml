@@ -1,0 +1,11 @@
+type: custom:toshiba-ac-plus-card
+entity: climate.living_room
+name: Living Room AC
+timer:
+  entity: timer.living_room_ac_off_timer
+features:
+  auto_detect: false
+  high_power: switch.living_room_high_power_mode
+  eco: switch.living_room_eco_mode
+  outdoor_silent: select.living_room_outdoor_unit_silent_mode
+  air_purifier: switch.living_room_air_purifier

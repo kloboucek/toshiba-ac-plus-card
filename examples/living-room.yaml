@@ -1,0 +1,8 @@
+type: custom:toshiba-ac-plus-card
+entity: climate.living_room
+name: Living Room AC
+timer:
+  entity: timer.living_room_ac_off_timer
+  durations: [15, 30, 60, 90, 120]
+features:
+  auto_detect: true
