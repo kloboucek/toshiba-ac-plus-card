@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.12";
+const CARD_VERSION = "0.2.13";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -47,6 +47,7 @@ const DIAL_RADIUS = 118;
 const DIAL_START_DEGREES = 140;
 const DIAL_SWEEP_DEGREES = 260;
 const DIAL_ARC_LENGTH = Math.round(DIAL_RADIUS * DIAL_SWEEP_DEGREES * Math.PI / 180);
+const DIAL_HIT_TOLERANCE = 18;
 
 function dialPoint(percent: number): { x: number; y: number } {
   const angle = (DIAL_START_DEGREES + percent * DIAL_SWEEP_DEGREES) * Math.PI / 180;
@@ -505,13 +506,25 @@ class ToshibaAcPlusCard extends HTMLElement {
   }
 
 
-  private temperatureFromClient(svg: SVGSVGElement, clientX: number, clientY: number, minTemp: number, maxTemp: number, step: number): number {
+  private clientDialPoint(svg: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number; degrees: number; distance: number; percent: number } {
     const rect = svg.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 320;
     const y = ((clientY - rect.top) / rect.height) * 320;
+    const distance = Math.hypot(x - DIAL_CENTER, y - DIAL_CENTER);
     let degrees = Math.atan2(y - DIAL_CENTER, x - DIAL_CENTER) * 180 / Math.PI;
     if (degrees < 0) degrees += 360;
     if (degrees < DIAL_START_DEGREES) degrees += 360;
+    const percent = (degrees - DIAL_START_DEGREES) / DIAL_SWEEP_DEGREES;
+    return { x, y, degrees, distance, percent };
+  }
+
+  private isClientOnDialArc(svg: SVGSVGElement, clientX: number, clientY: number): boolean {
+    const point = this.clientDialPoint(svg, clientX, clientY);
+    return point.percent >= 0 && point.percent <= 1 && Math.abs(point.distance - DIAL_RADIUS) <= DIAL_HIT_TOLERANCE;
+  }
+
+  private temperatureFromClient(svg: SVGSVGElement, clientX: number, clientY: number, minTemp: number, maxTemp: number, step: number): number {
+    const { degrees } = this.clientDialPoint(svg, clientX, clientY);
     const percent = Math.min(1, Math.max(0, (degrees - DIAL_START_DEGREES) / DIAL_SWEEP_DEGREES));
     const raw = minTemp + percent * (maxTemp - minTemp);
     const snapped = Math.round(raw / step) * step;
@@ -531,7 +544,7 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   private handleDialPointer(event: PointerEvent, svg: SVGSVGElement): void {
     const climate = this.climate;
-    if (!climate || this._isDraggingDial) return;
+    if (!climate || this._isDraggingDial || !this.isClientOnDialArc(svg, event.clientX, event.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const minTemp = numericAttribute(climate, "min_temp", 16);
     const maxTemp = numericAttribute(climate, "max_temp", 30);
@@ -566,7 +579,7 @@ class ToshibaAcPlusCard extends HTMLElement {
   private handleDialTouch(event: TouchEvent, svg: SVGSVGElement): void {
     const climate = this.climate;
     const touch = event.changedTouches[0];
-    if (!climate || !touch || this._isDraggingDial) return;
+    if (!climate || !touch || this._isDraggingDial || !this.isClientOnDialArc(svg, touch.clientX, touch.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const touchId = touch.identifier;
     const minTemp = numericAttribute(climate, "min_temp", 16);
@@ -821,7 +834,7 @@ const styles = `
   .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: none; user-select: none; -webkit-user-select: none; }
   .dial { width: 100%; height: 100%; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
-  .dial-hit { stroke: transparent; stroke-width: 58; cursor: pointer; touch-action: none; }
+  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; touch-action: none; }
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
