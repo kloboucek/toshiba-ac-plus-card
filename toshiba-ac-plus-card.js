@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.0";
+var CARD_VERSION = "0.2.1";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var FEATURE_LABELS = {
@@ -65,7 +65,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     this.render();
   }
   getCardSize() {
-    return 6;
+    return 8;
   }
   static getStubConfig(hass) {
     const climate = Object.keys(hass.states).find((entity) => entity.startsWith("climate."));
@@ -371,7 +371,7 @@ var styles = `
     overflow: hidden;
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     background: var(--ha-card-background, var(--card-background-color));
-    padding: 18px;
+    padding: 18px 18px 24px;
     color: var(--primary-text-color);
   }
   .header {
@@ -399,7 +399,7 @@ var styles = `
     text-align: center;
     pointer-events: none;
   }
-  .mode-label { font-size: 15px; font-weight: 700; color: var(--secondary-text-color); margin-bottom: 10px; }
+  .mode-label { font-size: 15px; font-weight: 700; color: var(--secondary-text-color); margin-bottom: -16px; position: relative; top: -32px; }
   .target-temp { font-size: 58px; font-weight: 300; line-height: .95; letter-spacing: -2px; }
   .temp-buttons { display: flex; gap: 26px; margin-top: -38px; z-index: 1; }
   .round-button {
@@ -427,13 +427,13 @@ var styles = `
   }
   .info-tile {
     display: grid;
-    grid-template-columns: 30px 1fr;
+    grid-template-columns: 42px 1fr;
     grid-template-areas: "icon label" "icon value";
     align-items: center;
     text-align: left;
     padding: 10px 12px;
   }
-  .info-tile ha-icon { grid-area: icon; --mdc-icon-size: 20px; color: var(--secondary-text-color); }
+  .info-tile ha-icon { grid-area: icon; --mdc-icon-size: 18px; color: var(--secondary-text-color); justify-self: center; }
   .info-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
   .info-tile strong { grid-area: value; font-size: 14px; line-height: 1.1; font-weight: 700; }
   .info-tile.active ha-icon, .tile.active ha-icon { color: var(--primary-color, #42a5f5); }
