@@ -9,21 +9,27 @@
   <rect x="260" y="52" width="440" height="436" rx="28" fill="#202938" stroke="#4b5563" stroke-width="2"/>
   <text x="300" y="105" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700">Living Room AC</text>
   <text x="300" y="132" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="15">climate.living_room</text>
-  <text x="300" y="218" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="74" font-weight="700">23<tspan font-size="30">°C</tspan></text>
-  <text x="566" y="199" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="end">25°C</text>
-  <text x="566" y="225" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="16" text-anchor="end">Current</text>
+  <text x="300" y="205" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="70" font-weight="700">23<tspan font-size="29">°C</tspan></text>
+  <text x="300" y="228" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="16">Target</text>
+  <text x="566" y="190" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="end">25°C</text>
+  <text x="566" y="216" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="16" text-anchor="end">Current</text>
+  <text x="300" y="258" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="13">17°C</text>
+  <text x="660" y="258" fill="#9ca3af" font-family="Inter,Arial,sans-serif" font-size="13" text-anchor="end">30°C</text>
+  <line x1="300" y1="278" x2="660" y2="278" stroke="#4b5563" stroke-width="8" stroke-linecap="round"/>
+  <line x1="300" y1="278" x2="466" y2="278" stroke="#60a5fa" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="466" cy="278" r="16" fill="#93c5fd" stroke="#dbeafe" stroke-width="3"/>
   <g font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" text-anchor="middle">
-    <rect x="300" y="258" width="104" height="44" rx="13" fill="#1f2937" stroke="#4b5563"/><text x="352" y="286" fill="#d1d5db">Off</text>
-    <rect x="424" y="258" width="104" height="44" rx="13" fill="#2563eb" fill-opacity=".35" stroke="#60a5fa"/><text x="476" y="286" fill="#f9fafb">Auto</text>
-    <rect x="548" y="258" width="104" height="44" rx="13" fill="#1f2937" stroke="#4b5563"/><text x="600" y="286" fill="#d1d5db">Cool</text>
+    <rect x="300" y="310" width="104" height="44" rx="13" fill="#1f2937" stroke="#4b5563"/><text x="352" y="338" fill="#d1d5db">Off</text>
+    <rect x="424" y="310" width="104" height="44" rx="13" fill="#2563eb" fill-opacity=".35" stroke="#60a5fa"/><text x="476" y="338" fill="#f9fafb">Auto</text>
+    <rect x="548" y="310" width="104" height="44" rx="13" fill="#1f2937" stroke="#4b5563"/><text x="600" y="338" fill="#d1d5db">Cool</text>
   </g>
-  <line x1="300" y1="330" x2="660" y2="330" stroke="#4b5563"/>
-  <text x="300" y="360" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">Turn-off timer</text>
-  <rect x="522" y="342" width="130" height="40" rx="12" fill="#1f2937" stroke="#4b5563"/>
-  <text x="587" y="367" fill="#d1d5db" font-family="Inter,Arial,sans-serif" font-size="15" text-anchor="middle">60 min</text>
+  <line x1="300" y1="378" x2="660" y2="378" stroke="#4b5563"/>
+  <text x="300" y="408" fill="#f9fafb" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700">Turn-off timer</text>
+  <rect x="522" y="390" width="130" height="40" rx="12" fill="#1f2937" stroke="#4b5563"/>
+  <text x="587" y="415" fill="#d1d5db" font-family="Inter,Arial,sans-serif" font-size="15" text-anchor="middle">60 min</text>
   <g font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" text-anchor="middle">
-    <rect x="300" y="406" width="104" height="58" rx="14" fill="#2563eb" fill-opacity=".28" stroke="#60a5fa"/><text x="352" y="440" fill="#f9fafb">Swing</text>
-    <rect x="424" y="406" width="104" height="58" rx="14" fill="#2563eb" fill-opacity=".28" stroke="#60a5fa"/><text x="476" y="440" fill="#f9fafb">Fan quiet</text>
-    <rect x="548" y="406" width="104" height="58" rx="14" fill="#374151" stroke="#4b5563"/><text x="600" y="440" fill="#d1d5db">ECO</text>
+    <rect x="300" y="440" width="104" height="38" rx="14" fill="#2563eb" fill-opacity=".28" stroke="#60a5fa"/><text x="352" y="464" fill="#f9fafb">Swing</text>
+    <rect x="424" y="440" width="104" height="38" rx="14" fill="#2563eb" fill-opacity=".28" stroke="#60a5fa"/><text x="476" y="464" fill="#f9fafb">Fan quiet</text>
+    <rect x="548" y="440" width="104" height="38" rx="14" fill="#374151" stroke="#4b5563"/><text x="600" y="464" fill="#d1d5db">ECO</text>
   </g>
 </svg>
