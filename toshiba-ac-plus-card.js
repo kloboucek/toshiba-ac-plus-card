@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.10";
+var CARD_VERSION = "0.2.11";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -98,11 +98,12 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     return 8;
   }
   static getStubConfig(hass) {
-    const climate = Object.keys(hass.states).find((entity) => entity.startsWith("climate."));
+    const climate = Object.keys(hass.states).find((entity2) => entity2.startsWith("climate."));
+    const entity = climate ? hass.states[climate] : void 0;
     return {
       type: "custom:toshiba-ac-plus-card",
       entity: climate ?? "climate.living_room",
-      name: climate ? titleCase(objectId(climate)) : "Living Room AC",
+      name: entity?.attributes.friendly_name?.toString() ?? (climate ? titleCase(objectId(climate)) : "Living Room AC"),
       features: { auto_detect: true }
     };
   }
@@ -602,10 +603,30 @@ var ToshibaAcPlusCardEditor = class extends HTMLElement {
       picker.hass = this._hass;
     });
   }
+  defaultName(entityId) {
+    if (!entityId) return "";
+    return this._hass?.states[entityId]?.attributes.friendly_name?.toString() ?? titleCase(objectId(entityId));
+  }
+  nameLooksAutomatic(name, entityId) {
+    if (!name || !entityId) return true;
+    return name === this.defaultName(entityId) || name === titleCase(objectId(entityId));
+  }
+  syncNameField(value) {
+    const field = this.querySelector('ha-textfield[data-key="name"]');
+    if (field) field.value = value;
+  }
   changed(key, value) {
     if (!this._config) return;
     const next = structuredClone(this._config);
-    if (key === "entity") next.entity = String(value || "");
+    if (key === "entity") {
+      const previousEntity = this._config.entity;
+      const previousName = this._config.name;
+      next.entity = String(value || "");
+      if (this.nameLooksAutomatic(previousName, previousEntity)) {
+        next.name = this.defaultName(next.entity);
+        this.syncNameField(next.name);
+      }
+    }
     if (key === "name") next.name = String(value || "");
     if (key === "timer.entity") {
       next.timer = { ...typeof next.timer === "object" ? next.timer : {}, entity: String(value || "") };
@@ -638,12 +659,12 @@ var styles = `
     gap: 12px;
     margin-bottom: 6px;
   }
-  .title { font-size: 18px; font-weight: 700; }
+  .title { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .subtitle, .muted { color: var(--secondary-text-color); font-size: 12px; }
   .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
-  .dial-wrap { position: relative; width: min(360px, 90vw); height: 306px; margin-top: 4px; }
+  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; }
   .dial { width: 100%; height: 100%; overflow: visible; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
   .dial-hit { stroke: transparent; stroke-width: 58; cursor: pointer; touch-action: none; }

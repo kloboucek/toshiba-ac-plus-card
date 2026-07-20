@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.10";
+const CARD_VERSION = "0.2.11";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -158,10 +158,11 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   static getStubConfig(hass: HomeAssistant): Partial<ToshibaAcPlusCardConfig> {
     const climate = Object.keys(hass.states).find((entity) => entity.startsWith("climate."));
+    const entity = climate ? hass.states[climate] : undefined;
     return {
       type: "custom:toshiba-ac-plus-card",
       entity: climate ?? "climate.living_room",
-      name: climate ? titleCase(objectId(climate)) : "Living Room AC",
+      name: entity?.attributes.friendly_name?.toString() ?? (climate ? titleCase(objectId(climate)) : "Living Room AC"),
       features: { auto_detect: true },
     };
   }
@@ -699,10 +700,33 @@ class ToshibaAcPlusCardEditor extends HTMLElement {
     });
   }
 
+  private defaultName(entityId: string | undefined): string {
+    if (!entityId) return "";
+    return this._hass?.states[entityId]?.attributes.friendly_name?.toString() ?? titleCase(objectId(entityId));
+  }
+
+  private nameLooksAutomatic(name: string | undefined, entityId: string | undefined): boolean {
+    if (!name || !entityId) return true;
+    return name === this.defaultName(entityId) || name === titleCase(objectId(entityId));
+  }
+
+  private syncNameField(value: string): void {
+    const field = this.querySelector<HTMLElement & { value?: string }>('ha-textfield[data-key="name"]');
+    if (field) field.value = value;
+  }
+
   private changed(key: string, value: unknown): void {
     if (!this._config) return;
     const next: ToshibaAcPlusCardConfig = structuredClone(this._config);
-    if (key === "entity") next.entity = String(value || "");
+    if (key === "entity") {
+      const previousEntity = this._config.entity;
+      const previousName = this._config.name;
+      next.entity = String(value || "");
+      if (this.nameLooksAutomatic(previousName, previousEntity)) {
+        next.name = this.defaultName(next.entity);
+        this.syncNameField(next.name);
+      }
+    }
     if (key === "name") next.name = String(value || "");
     if (key === "timer.entity") {
       next.timer = { ...(typeof next.timer === "object" ? next.timer : {}), entity: String(value || "") };
@@ -736,12 +760,12 @@ const styles = `
     gap: 12px;
     margin-bottom: 6px;
   }
-  .title { font-size: 18px; font-weight: 700; }
+  .title { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .subtitle, .muted { color: var(--secondary-text-color); font-size: 12px; }
   .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
   .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
-  .dial-wrap { position: relative; width: min(360px, 90vw); height: 306px; margin-top: 4px; }
+  .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; }
   .dial { width: 100%; height: 100%; overflow: visible; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
   .dial-hit { stroke: transparent; stroke-width: 58; cursor: pointer; touch-action: none; }
