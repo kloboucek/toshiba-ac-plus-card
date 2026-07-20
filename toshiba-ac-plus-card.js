@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.5";
+var CARD_VERSION = "0.2.6";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var DIAL_CENTER = 160;
@@ -152,11 +152,13 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     const minTemp = numericAttribute(entity, "min_temp", 16);
     const maxTemp = numericAttribute(entity, "max_temp", 30);
     const target = this._dragTemperature ?? stateTarget;
+    const currentTemperature = numericAttribute(entity, "current_temperature", target);
     const range = Math.max(maxTemp - minTemp, 1);
     const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
+    const currentPercent = Math.min(1, Math.max(0, (currentTemperature - minTemp) / range));
     const dash = Math.round(DIAL_ARC_LENGTH * percent);
     const thumb = dialPoint(percent);
-    const dot = dialPoint(0.28);
+    const dot = dialPoint(currentPercent);
     const arcPath = dialArcPath();
     const mode = titleCase(entity.state);
     return `
@@ -597,7 +599,8 @@ var styles = `
     z-index: 100;
     left: 0;
     right: 0;
-    top: calc(100% + 6px);
+    top: auto;
+    bottom: calc(100% + 6px);
     display: grid;
     gap: 4px;
     padding: 6px;
@@ -605,15 +608,6 @@ var styles = `
     border: 1px solid rgba(140,140,140,.22);
     background: var(--ha-card-background, var(--card-background-color));
     box-shadow: 0 10px 26px rgba(0,0,0,.35);
-    max-height: min(190px, 38vh);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  .extra-row .select-menu,
-  .info-grid .select-tile:nth-child(3) .select-menu,
-  .info-grid .select-tile:nth-child(4) .select-menu {
-    top: auto;
-    bottom: calc(100% + 6px);
   }
   .select-option {
     border: 0;
