@@ -1,7 +1,8 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.8";
+var CARD_VERSION = "0.2.9";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
+var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
 var DIAL_CENTER = 160;
 var DIAL_RADIUS = 118;
 var DIAL_START_DEGREES = 140;
@@ -83,6 +84,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       ...config,
       features: { auto_detect: true, ...config.features ?? {} }
     };
+    this.loadPendingSettings();
     this.render();
   }
   set hass(hass) {
@@ -109,6 +111,46 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
   get climate() {
     return this._config && this._hass?.states[this._config.entity];
+  }
+  pendingStorageKey() {
+    return this._config ? `${PENDING_STORAGE_PREFIX}${this._config.entity}` : void 0;
+  }
+  loadPendingSettings() {
+    const key = this.pendingStorageKey();
+    if (!key) return;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const pending = JSON.parse(raw);
+      this._pendingPresetMode = typeof pending.preset === "string" ? pending.preset : void 0;
+      this._pendingFanMode = typeof pending.fan === "string" ? pending.fan : void 0;
+      this._pendingSwingMode = typeof pending.swing === "string" ? pending.swing : void 0;
+    } catch {
+      this.clearPendingSettings();
+    }
+  }
+  savePendingSettings() {
+    const key = this.pendingStorageKey();
+    if (!key) return;
+    const pending = {
+      preset: this._pendingPresetMode,
+      fan: this._pendingFanMode,
+      swing: this._pendingSwingMode
+    };
+    try {
+      if (!pending.preset && !pending.fan && !pending.swing) {
+        window.localStorage.removeItem(key);
+        return;
+      }
+      window.localStorage.setItem(key, JSON.stringify(pending));
+    } catch {
+    }
+  }
+  clearPendingSettings() {
+    this._pendingPresetMode = void 0;
+    this._pendingFanMode = void 0;
+    this._pendingSwingMode = void 0;
+    this.savePendingSettings();
   }
   featureEntity(feature) {
     const config = this._config;
@@ -324,30 +366,36 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingPresetMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingPresetMode = void 0;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_preset_mode", { preset_mode: value }, { entity_id: this._config.entity });
   }
   setFanMode(value) {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingFanMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingFanMode = void 0;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_fan_mode", { fan_mode: value }, { entity_id: this._config.entity });
   }
   setSwingMode(value) {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingSwingMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingSwingMode = void 0;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_swing_mode", { swing_mode: value }, { entity_id: this._config.entity });
   }
   applyPendingSettingsAfterModeChange() {
@@ -361,9 +409,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       if (presetMode) this._hass.callService("climate", "set_preset_mode", { preset_mode: presetMode }, { entity_id: this._config.entity });
       if (fanMode) this._hass.callService("climate", "set_fan_mode", { fan_mode: fanMode }, { entity_id: this._config.entity });
       if (swingMode) this._hass.callService("climate", "set_swing_mode", { swing_mode: swingMode }, { entity_id: this._config.entity });
-      this._pendingPresetMode = void 0;
-      this._pendingFanMode = void 0;
-      this._pendingSwingMode = void 0;
+      this.clearPendingSettings();
     }, 900);
   }
   handleDialPointer(event, svg) {

@@ -37,9 +37,10 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.8";
+const CARD_VERSION = "0.2.9";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
+const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
 
 const DIAL_CENTER = 160;
 const DIAL_RADIUS = 118;
@@ -139,6 +140,7 @@ class ToshibaAcPlusCard extends HTMLElement {
       ...config,
       features: { auto_detect: true, ...(config.features ?? {}) },
     };
+    this.loadPendingSettings();
     this.render();
   }
 
@@ -170,6 +172,51 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   private get climate(): HassEntity | undefined {
     return this._config && this._hass?.states[this._config.entity];
+  }
+
+  private pendingStorageKey(): string | undefined {
+    return this._config ? `${PENDING_STORAGE_PREFIX}${this._config.entity}` : undefined;
+  }
+
+  private loadPendingSettings(): void {
+    const key = this.pendingStorageKey();
+    if (!key) return;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const pending = JSON.parse(raw) as { preset?: unknown; fan?: unknown; swing?: unknown };
+      this._pendingPresetMode = typeof pending.preset === "string" ? pending.preset : undefined;
+      this._pendingFanMode = typeof pending.fan === "string" ? pending.fan : undefined;
+      this._pendingSwingMode = typeof pending.swing === "string" ? pending.swing : undefined;
+    } catch {
+      this.clearPendingSettings();
+    }
+  }
+
+  private savePendingSettings(): void {
+    const key = this.pendingStorageKey();
+    if (!key) return;
+    const pending = {
+      preset: this._pendingPresetMode,
+      fan: this._pendingFanMode,
+      swing: this._pendingSwingMode,
+    };
+    try {
+      if (!pending.preset && !pending.fan && !pending.swing) {
+        window.localStorage.removeItem(key);
+        return;
+      }
+      window.localStorage.setItem(key, JSON.stringify(pending));
+    } catch {
+      // localStorage may be unavailable in some privacy/browser contexts; in-memory staging still works.
+    }
+  }
+
+  private clearPendingSettings(): void {
+    this._pendingPresetMode = undefined;
+    this._pendingFanMode = undefined;
+    this._pendingSwingMode = undefined;
+    this.savePendingSettings();
   }
 
   private featureEntity(feature: FeatureName): string | undefined {
@@ -404,10 +451,12 @@ class ToshibaAcPlusCard extends HTMLElement {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingPresetMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingPresetMode = undefined;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_preset_mode", { preset_mode: value }, { entity_id: this._config.entity });
   }
 
@@ -415,10 +464,12 @@ class ToshibaAcPlusCard extends HTMLElement {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingFanMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingFanMode = undefined;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_fan_mode", { fan_mode: value }, { entity_id: this._config.entity });
   }
 
@@ -426,10 +477,12 @@ class ToshibaAcPlusCard extends HTMLElement {
     if (!this._hass || !this._config) return;
     if (this.isClimateOff()) {
       this._pendingSwingMode = value;
+      this.savePendingSettings();
       this.render();
       return;
     }
     this._pendingSwingMode = undefined;
+    this.savePendingSettings();
     this._hass.callService("climate", "set_swing_mode", { swing_mode: value }, { entity_id: this._config.entity });
   }
 
@@ -444,9 +497,7 @@ class ToshibaAcPlusCard extends HTMLElement {
       if (presetMode) this._hass.callService("climate", "set_preset_mode", { preset_mode: presetMode }, { entity_id: this._config.entity });
       if (fanMode) this._hass.callService("climate", "set_fan_mode", { fan_mode: fanMode }, { entity_id: this._config.entity });
       if (swingMode) this._hass.callService("climate", "set_swing_mode", { swing_mode: swingMode }, { entity_id: this._config.entity });
-      this._pendingPresetMode = undefined;
-      this._pendingFanMode = undefined;
-      this._pendingSwingMode = undefined;
+      this.clearPendingSettings();
     }, 900);
   }
 
