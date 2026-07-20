@@ -37,9 +37,29 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.4";
+const CARD_VERSION = "0.2.5";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
+
+const DIAL_CENTER = 160;
+const DIAL_RADIUS = 118;
+const DIAL_START_DEGREES = 140;
+const DIAL_SWEEP_DEGREES = 260;
+const DIAL_ARC_LENGTH = Math.round(DIAL_RADIUS * DIAL_SWEEP_DEGREES * Math.PI / 180);
+
+function dialPoint(percent: number): { x: number; y: number } {
+  const angle = (DIAL_START_DEGREES + percent * DIAL_SWEEP_DEGREES) * Math.PI / 180;
+  return {
+    x: DIAL_CENTER + DIAL_RADIUS * Math.cos(angle),
+    y: DIAL_CENTER + DIAL_RADIUS * Math.sin(angle),
+  };
+}
+
+function dialArcPath(): string {
+  const start = dialPoint(0);
+  const end = dialPoint(1);
+  return `M${start.x.toFixed(1)} ${start.y.toFixed(1)} A${DIAL_RADIUS} ${DIAL_RADIUS} 0 1 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+}
 const FEATURE_LABELS: Record<FeatureName, { name: string; icon: string }> = {
   high_power: { name: "High power", icon: "mdi:high-power" },
   eco: { name: "ECO", icon: "mdi:eco" },
@@ -105,6 +125,8 @@ function nextFromList(values: string[], current: unknown, fallback: string): str
 class ToshibaAcPlusCard extends HTMLElement {
   private _hass?: HomeAssistant;
   private _config?: ToshibaAcPlusCardConfig;
+  private _isDraggingDial = false;
+  private _dragTemperature?: number;
 
   setConfig(config: ToshibaAcPlusCardConfig): void {
     if (!config.entity) {
@@ -119,7 +141,7 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   set hass(hass: HomeAssistant) {
     this._hass = hass;
-    if (this.querySelector("details[open]")) {
+    if (this._isDraggingDial || this.querySelector("details[open]")) {
       return;
     }
     this.render();
@@ -190,16 +212,16 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   private renderClimate(entity: HassEntity): string {
     const unit = entity.attributes.temperature_unit ?? "°C";
-    const target = numericAttribute(entity, "temperature", numericAttribute(entity, "current_temperature", 22));
+    const stateTarget = numericAttribute(entity, "temperature", numericAttribute(entity, "current_temperature", 22));
     const minTemp = numericAttribute(entity, "min_temp", 16);
     const maxTemp = numericAttribute(entity, "max_temp", 30);
+    const target = this._dragTemperature ?? stateTarget;
     const range = Math.max(maxTemp - minTemp, 1);
     const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
-    const arcLength = 500;
-    const dash = Math.round(arcLength * percent);
-    const angle = (143 + percent * 254) * Math.PI / 180;
-    const thumbX = 160 + 118 * Math.cos(angle);
-    const thumbY = 160 + 118 * Math.sin(angle);
+    const dash = Math.round(DIAL_ARC_LENGTH * percent);
+    const thumb = dialPoint(percent);
+    const dot = dialPoint(.28);
+    const arcPath = dialArcPath();
     const mode = titleCase(entity.state);
 
     return `
@@ -208,11 +230,11 @@ class ToshibaAcPlusCard extends HTMLElement {
         <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
         <div class="dial-wrap">
           <svg class="dial" viewBox="0 0 320 320" data-action="dial" aria-label="Drag or click to set target temperature">
-            <path class="dial-hit" d="M76 254 A118 118 0 1 1 244 254" />
-            <path class="dial-track" d="M76 254 A118 118 0 1 1 244 254" />
-            <path class="dial-progress" d="M76 254 A118 118 0 1 1 244 254" stroke-dasharray="${dash} ${arcLength}" />
-            <circle class="dial-thumb" cx="${thumbX}" cy="${thumbY}" r="13" />
-            <circle class="dial-dot" cx="247" cy="113" r="4" />
+            <path class="dial-hit" d="${arcPath}" />
+            <path class="dial-track" d="${arcPath}" />
+            <path class="dial-progress" d="${arcPath}" stroke-dasharray="${dash} ${DIAL_ARC_LENGTH}" />
+            <circle class="dial-thumb" cx="${thumb.x}" cy="${thumb.y}" r="13" />
+            <circle class="dial-dot" cx="${dot.x}" cy="${dot.y}" r="4" />
           </svg>
           <div class="dial-center" data-role="dial-center" data-unit="${unit}" data-min="${minTemp}" data-max="${maxTemp}" data-step="${numericAttribute(entity, "target_temp_step", 1)}">
             <div class="mode-label">${mode}</div>
@@ -376,13 +398,11 @@ class ToshibaAcPlusCard extends HTMLElement {
     const unit = climate.attributes.temperature_unit ?? "°C";
     const preview = (temperature: number): void => {
       const percent = Math.min(1, Math.max(0, (temperature - minTemp) / Math.max(maxTemp - minTemp, 1)));
-      const angle = (143 + percent * 254) * Math.PI / 180;
-      const thumbX = 160 + 118 * Math.cos(angle);
-      const thumbY = 160 + 118 * Math.sin(angle);
-      svg.querySelector<SVGPathElement>(".dial-progress")?.setAttribute("stroke-dasharray", `${Math.round(500 * percent)} 500`);
+      const thumbPoint = dialPoint(percent);
+      svg.querySelector<SVGPathElement>(".dial-progress")?.setAttribute("stroke-dasharray", `${Math.round(DIAL_ARC_LENGTH * percent)} ${DIAL_ARC_LENGTH}`);
       const thumb = svg.querySelector<SVGCircleElement>(".dial-thumb");
-      thumb?.setAttribute("cx", String(thumbX));
-      thumb?.setAttribute("cy", String(thumbY));
+      thumb?.setAttribute("cx", String(thumbPoint.x));
+      thumb?.setAttribute("cy", String(thumbPoint.y));
       const target = this.querySelector<HTMLElement>('[data-role="target-temp"]');
       if (target) target.textContent = formatTemperature(temperature, unit);
     };
@@ -390,19 +410,22 @@ class ToshibaAcPlusCard extends HTMLElement {
       const rect = svg.getBoundingClientRect();
       const x = ((pointer.clientX - rect.left) / rect.width) * 320;
       const y = ((pointer.clientY - rect.top) / rect.height) * 320;
-      let degrees = Math.atan2(y - 160, x - 160) * 180 / Math.PI;
+      let degrees = Math.atan2(y - DIAL_CENTER, x - DIAL_CENTER) * 180 / Math.PI;
       if (degrees < 0) degrees += 360;
-      if (degrees < 143) degrees += 360;
-      const percent = Math.min(1, Math.max(0, (degrees - 143) / 254));
+      if (degrees < DIAL_START_DEGREES) degrees += 360;
+      const percent = Math.min(1, Math.max(0, (degrees - DIAL_START_DEGREES) / DIAL_SWEEP_DEGREES));
       const raw = minTemp + percent * (maxTemp - minTemp);
       const snapped = Math.round(raw / step) * step;
       return Math.min(maxTemp, Math.max(minTemp, snapped));
     };
     const update = (pointer: PointerEvent): void => {
       pendingTemperature = temperatureFromPointer(pointer);
+      this._dragTemperature = pendingTemperature;
       window.requestAnimationFrame(() => preview(pendingTemperature));
     };
     event.preventDefault();
+    this._isDraggingDial = true;
+    this._dragTemperature = pendingTemperature;
     svg.setPointerCapture?.(event.pointerId);
     update(event);
     const move = (moveEvent: PointerEvent): void => update(moveEvent);
@@ -410,7 +433,11 @@ class ToshibaAcPlusCard extends HTMLElement {
       svg.removeEventListener("pointermove", move);
       svg.removeEventListener("pointerup", stop);
       svg.removeEventListener("pointercancel", stop);
+      try { svg.releasePointerCapture?.(event.pointerId); } catch { /* pointer capture may already be gone */ }
+      this._isDraggingDial = false;
+      this._dragTemperature = undefined;
       this.setTargetTemperature(pendingTemperature);
+      this.render();
     };
     svg.addEventListener("pointermove", move);
     svg.addEventListener("pointerup", stop);
@@ -665,8 +692,13 @@ const styles = `
     border: 1px solid rgba(140,140,140,.22);
     background: var(--ha-card-background, var(--card-background-color));
     box-shadow: 0 10px 26px rgba(0,0,0,.35);
+    max-height: min(190px, 38vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .extra-row .select-menu {
+  .extra-row .select-menu,
+  .info-grid .select-tile:nth-child(3) .select-menu,
+  .info-grid .select-tile:nth-child(4) .select-menu {
     top: auto;
     bottom: calc(100% + 6px);
   }
