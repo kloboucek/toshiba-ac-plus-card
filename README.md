@@ -141,3 +141,4 @@ cards:
 - If entity names differ from the auto-detected pattern, configure the feature entities manually.
 - Mode, Preset, Fan mode, Swing mode, and Timer use styled in-card dropdown menus. The card pauses live re-rendering while a dropdown is open so menus do not disappear before selection; all menus open upward from their tile.
 - When the climate entity is off, Preset, Fan mode, and Swing mode selections are held locally and persisted in browser localStorage per climate entity. They survive dashboard switches/page refreshes in the same browser and are applied only after the user turns the AC on via the main Mode dropdown.
+- The visual config editor keeps HA entity pickers mounted during live HA updates, so the climate/timer search dropdowns stay stable while typing.

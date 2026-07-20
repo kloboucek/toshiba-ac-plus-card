@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.9";
+const CARD_VERSION = "0.2.10";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -642,15 +642,20 @@ class ToshibaAcPlusCard extends HTMLElement {
 class ToshibaAcPlusCardEditor extends HTMLElement {
   private _hass?: HomeAssistant;
   private _config?: ToshibaAcPlusCardConfig;
+  private _rendered = false;
 
   setConfig(config: ToshibaAcPlusCardConfig): void {
     this._config = { ...config, features: { auto_detect: true, ...(config.features ?? {}) } };
-    this.render();
+    if (!this._rendered) this.render();
   }
 
   set hass(hass: HomeAssistant) {
     this._hass = hass;
-    this.render();
+    if (!this._rendered) {
+      this.render();
+      return;
+    }
+    this.updatePickerHass();
   }
 
   private render(): void {
@@ -660,7 +665,7 @@ class ToshibaAcPlusCardEditor extends HTMLElement {
     this.innerHTML = `
       <div class="editor">
         <label>Climate entity</label>
-        <ha-entity-picker .hass="${""}" data-key="entity" domain-filter="climate" value="${this._config.entity ?? ""}" allow-custom-entity></ha-entity-picker>
+        <ha-entity-picker data-key="entity" domain-filter="climate" value="${this._config.entity ?? ""}" allow-custom-entity></ha-entity-picker>
         <label>Name</label>
         <ha-textfield data-key="name" value="${this._config.name ?? ""}"></ha-textfield>
         <label>Timer entity</label>
@@ -675,8 +680,8 @@ class ToshibaAcPlusCardEditor extends HTMLElement {
         ha-textfield, ha-entity-picker { width: 100%; }
       </style>
     `;
+    this.updatePickerHass();
     this.querySelectorAll("ha-entity-picker").forEach((picker) => {
-      (picker as unknown as { hass?: HomeAssistant }).hass = this._hass;
       picker.addEventListener("value-changed", (event) => this.changed((picker as HTMLElement).dataset.key!, (event as CustomEvent).detail.value));
     });
     this.querySelectorAll("ha-textfield").forEach((field) => {
@@ -684,6 +689,13 @@ class ToshibaAcPlusCardEditor extends HTMLElement {
     });
     this.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((input) => {
       input.addEventListener("change", () => this.changed(input.dataset.key!, input.checked));
+    });
+    this._rendered = true;
+  }
+
+  private updatePickerHass(): void {
+    this.querySelectorAll("ha-entity-picker").forEach((picker) => {
+      (picker as unknown as { hass?: HomeAssistant }).hass = this._hass;
     });
   }
 

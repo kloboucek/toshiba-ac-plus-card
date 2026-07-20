@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.9";
+var CARD_VERSION = "0.2.10";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -547,13 +547,21 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
 };
 var ToshibaAcPlusCardEditor = class extends HTMLElement {
+  constructor() {
+    super(...arguments);
+    this._rendered = false;
+  }
   setConfig(config) {
     this._config = { ...config, features: { auto_detect: true, ...config.features ?? {} } };
-    this.render();
+    if (!this._rendered) this.render();
   }
   set hass(hass) {
     this._hass = hass;
-    this.render();
+    if (!this._rendered) {
+      this.render();
+      return;
+    }
+    this.updatePickerHass();
   }
   render() {
     if (!this._config) return;
@@ -562,7 +570,7 @@ var ToshibaAcPlusCardEditor = class extends HTMLElement {
     this.innerHTML = `
       <div class="editor">
         <label>Climate entity</label>
-        <ha-entity-picker .hass="${""}" data-key="entity" domain-filter="climate" value="${this._config.entity ?? ""}" allow-custom-entity></ha-entity-picker>
+        <ha-entity-picker data-key="entity" domain-filter="climate" value="${this._config.entity ?? ""}" allow-custom-entity></ha-entity-picker>
         <label>Name</label>
         <ha-textfield data-key="name" value="${this._config.name ?? ""}"></ha-textfield>
         <label>Timer entity</label>
@@ -577,8 +585,8 @@ var ToshibaAcPlusCardEditor = class extends HTMLElement {
         ha-textfield, ha-entity-picker { width: 100%; }
       </style>
     `;
+    this.updatePickerHass();
     this.querySelectorAll("ha-entity-picker").forEach((picker) => {
-      picker.hass = this._hass;
       picker.addEventListener("value-changed", (event) => this.changed(picker.dataset.key, event.detail.value));
     });
     this.querySelectorAll("ha-textfield").forEach((field) => {
@@ -586,6 +594,12 @@ var ToshibaAcPlusCardEditor = class extends HTMLElement {
     });
     this.querySelectorAll('input[type="checkbox"]').forEach((input) => {
       input.addEventListener("change", () => this.changed(input.dataset.key, input.checked));
+    });
+    this._rendered = true;
+  }
+  updatePickerHass() {
+    this.querySelectorAll("ha-entity-picker").forEach((picker) => {
+      picker.hass = this._hass;
     });
   }
   changed(key, value) {
