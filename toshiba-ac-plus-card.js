@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.1.0";
+var CARD_VERSION = "0.1.2";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var FEATURE_LABELS = {
@@ -31,6 +31,15 @@ function durationToTime(minutes) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
+}
+function numericAttribute(entity, key, fallback) {
+  const value = Number(entity.attributes[key]);
+  return Number.isFinite(value) ? value : fallback;
+}
+function formatTemperature(value, unit) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "\u2014";
+  return `${numeric.toLocaleString(void 0, { maximumFractionDigits: 1 })}${unit ?? "\xB0C"}`;
 }
 var ToshibaAcPlusCard = class extends HTMLElement {
   setConfig(config) {
@@ -103,9 +112,11 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     this.bindEvents();
   }
   renderClimate(entity) {
-    const current = entity.attributes.current_temperature;
-    const target = entity.attributes.temperature;
     const unit = entity.attributes.temperature_unit ?? "\xB0C";
+    const target = numericAttribute(entity, "temperature", numericAttribute(entity, "current_temperature", 22));
+    const minTemp = numericAttribute(entity, "min_temp", 16);
+    const maxTemp = numericAttribute(entity, "max_temp", 30);
+    const step = numericAttribute(entity, "target_temp_step", 0.5);
     const state = entity.state;
     const supportedModes = Array.isArray(entity.attributes.hvac_modes) ? entity.attributes.hvac_modes : HVAC_MODES;
     const modes = HVAC_MODES.filter((mode) => supportedModes.includes(mode));
@@ -113,13 +124,29 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       <div class="climate-block">
         <div class="temperatures">
           <div>
-            <div class="big-temp">${target ?? "\u2014"}<span>${unit}</span></div>
+            <div class="big-temp">${formatTemperature(target, unit)}</div>
             <div class="muted">Target</div>
           </div>
           <div class="current-temp">
-            <div>${current ?? "\u2014"}${unit}</div>
+            <div>${formatTemperature(entity.attributes.current_temperature, unit)}</div>
             <div class="muted">Current</div>
           </div>
+        </div>
+        <div class="temperature-control">
+          <div class="temperature-scale">
+            <span>${formatTemperature(minTemp, unit)}</span>
+            <span>${formatTemperature(maxTemp, unit)}</span>
+          </div>
+          <input
+            class="temperature-slider"
+            type="range"
+            min="${minTemp}"
+            max="${maxTemp}"
+            step="${step}"
+            value="${target}"
+            data-action="temperature"
+            aria-label="Set target temperature"
+          >
         </div>
         <div class="mode-grid">
           ${modes.map((mode) => `
@@ -193,8 +220,18 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         element.addEventListener("change", () => this.handleTimer(element));
         return;
       }
+      if (element instanceof HTMLInputElement && action === "temperature") {
+        element.addEventListener("change", () => this.handleTemperature(element));
+        return;
+      }
       element.addEventListener("click", () => this.handleAction(element));
     });
+  }
+  handleTemperature(input) {
+    if (!this._hass || !this._config) return;
+    const temperature = Number(input.value);
+    if (!Number.isFinite(temperature)) return;
+    this._hass.callService("climate", "set_temperature", { temperature }, { entity_id: this._config.entity });
   }
   handleAction(element) {
     if (!this._hass || !this._config) return;
@@ -322,8 +359,16 @@ var styles = `
   .subtitle, .muted { color: var(--secondary-text-color); font-size: 12px; }
   .climate-block { margin-top: 14px; }
   .big-temp { font-size: 42px; font-weight: 700; line-height: 1; }
-  .big-temp span { font-size: 18px; margin-left: 2px; }
   .current-temp { text-align: right; font-size: 18px; }
+  .temperature-control { margin-top: 14px; }
+  .temperature-scale { display: flex; justify-content: space-between; color: var(--secondary-text-color); font-size: 11px; margin-bottom: 4px; }
+  .temperature-slider {
+    width: 100%;
+    accent-color: var(--primary-color, #42a5f5);
+    cursor: pointer;
+  }
+  .temperature-slider::-webkit-slider-thumb { cursor: pointer; }
+  .temperature-slider::-moz-range-thumb { cursor: pointer; }
   .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
   .mode-button, .tile, .timer-select {
     border: 1px solid rgba(140,140,140,.22);
