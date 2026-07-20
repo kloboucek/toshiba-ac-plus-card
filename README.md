@@ -140,3 +140,4 @@ cards:
 - Some Toshiba feature entities are unavailable when the AC is off or in an incompatible mode. The card greys those controls out.
 - If entity names differ from the auto-detected pattern, configure the feature entities manually.
 - Mode, Preset, Fan mode, Swing mode, and Timer use styled in-card dropdown menus. The card pauses live re-rendering while a dropdown is open so menus do not disappear before selection; all menus open upward from their tile.
+- When the climate entity is off, Preset, Fan mode, and Swing mode selections are held locally and do not call Home Assistant services until the user turns the AC on via the main Mode dropdown.

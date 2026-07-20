@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.7";
+const CARD_VERSION = "0.2.8";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 
@@ -127,6 +127,9 @@ class ToshibaAcPlusCard extends HTMLElement {
   private _config?: ToshibaAcPlusCardConfig;
   private _isDraggingDial = false;
   private _dragTemperature?: number;
+  private _pendingPresetMode?: string;
+  private _pendingFanMode?: string;
+  private _pendingSwingMode?: string;
 
   setConfig(config: ToshibaAcPlusCardConfig): void {
     if (!config.entity) {
@@ -268,15 +271,19 @@ class ToshibaAcPlusCard extends HTMLElement {
     const presetModes = asStringArray(climate?.attributes.preset_modes);
     const fanModes = asStringArray(climate?.attributes.fan_modes);
     const swingModes = asStringArray(climate?.attributes.swing_modes);
+    const climateOff = !climate || climate.state === "off";
+    const presetValue = climateOff ? (this._pendingPresetMode ?? String(climate?.attributes.preset_mode ?? "")) : String(climate?.attributes.preset_mode ?? "");
+    const fanValue = climateOff ? (this._pendingFanMode ?? String(climate?.attributes.fan_mode ?? "")) : String(climate?.attributes.fan_mode ?? "");
+    const swingValue = climateOff ? (this._pendingSwingMode ?? String(climate?.attributes.swing_mode ?? "")) : String(climate?.attributes.swing_mode ?? "");
     const highPower = this.featureEntity("high_power");
     const eco = this.featureEntity("eco");
 
     return `
       <div class="info-grid">
         ${this.renderSelectTile("hvacSelect", "mdi:snowflake", "Mode", String(climate?.state ?? "off"), hvacModes.length ? hvacModes : HVAC_MODES)}
-        ${this.renderSelectTile("presetSelect", "mdi:circle-small", "Preset", String(climate?.attributes.preset_mode ?? ""), presetModes)}
-        ${this.renderSelectTile("fanSelect", "mdi:circle-small", "Fan mode", String(climate?.attributes.fan_mode ?? ""), fanModes)}
-        ${this.renderSelectTile("swingSelect", "mdi:circle-small", "Swing mode", String(climate?.attributes.swing_mode ?? ""), swingModes)}
+        ${this.renderSelectTile("presetSelect", "mdi:circle-small", "Preset", presetValue, presetModes)}
+        ${this.renderSelectTile("fanSelect", "mdi:circle-small", "Fan mode", fanValue, fanModes)}
+        ${this.renderSelectTile("swingSelect", "mdi:circle-small", "Swing mode", swingValue, swingModes)}
       </div>
       <div class="extra-row">
         ${this.renderFeatureTile("high_power", highPower)}
@@ -373,19 +380,74 @@ class ToshibaAcPlusCard extends HTMLElement {
     }
     if (action === "hvacSelect") {
       this._hass.callService("climate", "set_hvac_mode", { hvac_mode: value }, { entity_id: this._config.entity });
+      if (value !== "off") this.applyPendingSettingsAfterModeChange();
       return;
     }
     if (action === "presetSelect") {
-      this._hass.callService("climate", "set_preset_mode", { preset_mode: value }, { entity_id: this._config.entity });
+      this.setPresetMode(value);
       return;
     }
     if (action === "fanSelect") {
-      this._hass.callService("climate", "set_fan_mode", { fan_mode: value }, { entity_id: this._config.entity });
+      this.setFanMode(value);
       return;
     }
     if (action === "swingSelect") {
-      this._hass.callService("climate", "set_swing_mode", { swing_mode: value }, { entity_id: this._config.entity });
+      this.setSwingMode(value);
     }
+  }
+
+  private isClimateOff(): boolean {
+    return this.climate?.state === "off";
+  }
+
+  private setPresetMode(value: string): void {
+    if (!this._hass || !this._config) return;
+    if (this.isClimateOff()) {
+      this._pendingPresetMode = value;
+      this.render();
+      return;
+    }
+    this._pendingPresetMode = undefined;
+    this._hass.callService("climate", "set_preset_mode", { preset_mode: value }, { entity_id: this._config.entity });
+  }
+
+  private setFanMode(value: string): void {
+    if (!this._hass || !this._config) return;
+    if (this.isClimateOff()) {
+      this._pendingFanMode = value;
+      this.render();
+      return;
+    }
+    this._pendingFanMode = undefined;
+    this._hass.callService("climate", "set_fan_mode", { fan_mode: value }, { entity_id: this._config.entity });
+  }
+
+  private setSwingMode(value: string): void {
+    if (!this._hass || !this._config) return;
+    if (this.isClimateOff()) {
+      this._pendingSwingMode = value;
+      this.render();
+      return;
+    }
+    this._pendingSwingMode = undefined;
+    this._hass.callService("climate", "set_swing_mode", { swing_mode: value }, { entity_id: this._config.entity });
+  }
+
+  private applyPendingSettingsAfterModeChange(): void {
+    if (!this._hass || !this._config) return;
+    const presetMode = this._pendingPresetMode;
+    const fanMode = this._pendingFanMode;
+    const swingMode = this._pendingSwingMode;
+    if (!presetMode && !fanMode && !swingMode) return;
+    window.setTimeout(() => {
+      if (!this._hass || !this._config) return;
+      if (presetMode) this._hass.callService("climate", "set_preset_mode", { preset_mode: presetMode }, { entity_id: this._config.entity });
+      if (fanMode) this._hass.callService("climate", "set_fan_mode", { fan_mode: fanMode }, { entity_id: this._config.entity });
+      if (swingMode) this._hass.callService("climate", "set_swing_mode", { swing_mode: swingMode }, { entity_id: this._config.entity });
+      this._pendingPresetMode = undefined;
+      this._pendingFanMode = undefined;
+      this._pendingSwingMode = undefined;
+    }, 900);
   }
 
 
