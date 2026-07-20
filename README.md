@@ -1,17 +1,17 @@
 # Toshiba AC Plus Card
 
-![Toshiba AC Plus Card circular thermostat preview](assets/preview-v0.2.1.svg)
+![Toshiba AC Plus Card circular thermostat preview](assets/preview-v0.2.2.svg)
 
 A Home Assistant Lovelace dashboard card for Toshiba AC units exposed through the Toshiba AC Community integration.
 
 It provides a compact circular thermostat-style climate card with practical extra controls:
 
-- Current temperature + target temperature dial
+- Current temperature + draggable/clickable target temperature dial
 - Plus/minus target temperature buttons
-- Mode tile
-- Preset tile
-- Fan mode tile
-- Swing mode tile
+- Mode dropdown tile
+- Preset dropdown tile
+- Fan mode dropdown tile
+- Swing mode dropdown tile
 - High power toggle
 - ECO toggle
 - Optional native Home Assistant timer helper selector

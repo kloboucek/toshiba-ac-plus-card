@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="680" viewBox="0 0 960 680" role="img" aria-label="Toshiba AC Plus Card circular thermostat preview">
+  <rect width="960" height="680" fill="#151515"/>
+  <rect x="275" y="28" width="410" height="624" rx="26" fill="#1c1c1c" stroke="#2b2b2b"/>
+  <text x="480" y="72" fill="#bdbdbd" font-family="Inter,Arial,sans-serif" font-size="17" text-anchor="middle" font-weight="700">Current temperature</text>
+  <text x="480" y="108" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="27" text-anchor="middle" font-weight="700">27 °C</text>
+
+  <path d="M357 371 A150 150 0 1 1 603 371" fill="none" stroke="#262626" stroke-width="30" stroke-linecap="round"/>
+  <path d="M603 371 A150 150 0 0 0 628 271" fill="none" stroke="#1e88d7" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="628" cy="271" r="18" fill="#e3f2fd" stroke="#42a5f5" stroke-width="5"/>
+  <circle cx="620" cy="215" r="5" fill="#8f8f8f"/>
+
+  <text x="480" y="228" fill="#dedede" font-family="Inter,Arial,sans-serif" font-size="20" text-anchor="middle" font-weight="700">Cool</text>
+  <text x="480" y="328" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="76" text-anchor="middle" font-weight="300">28<tspan font-size="24"> °C</tspan></text>
+
+  <circle cx="437" cy="394" r="28" fill="none" stroke="#777"/>
+  <text x="437" y="403" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="middle">−</text>
+  <circle cx="523" cy="394" r="28" fill="none" stroke="#777"/>
+  <text x="523" y="403" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="middle">+</text>
+
+  <g font-family="Inter,Arial,sans-serif">
+    <rect x="325" y="455" width="150" height="58" rx="12" fill="#242424"/>
+    <text x="373" y="478" fill="#bdbdbd" font-size="13">Mode</text>
+    <text x="373" y="497" fill="#f0f0f0" font-size="16" font-weight="700">Cool</text>
+    <text x="344" y="490" fill="#d8d8d8" font-size="19">❄</text>
+
+    <rect x="495" y="455" width="150" height="58" rx="12" fill="#242424"/>
+    <text x="533" y="478" fill="#bdbdbd" font-size="13">Preset</text>
+    <text x="533" y="497" fill="#f0f0f0" font-size="16" font-weight="700">Power 50</text><text x="626" y="492" fill="#bdbdbd" font-size="16">⌄</text>
+    <circle cx="515" cy="486" r="4" fill="#d8d8d8"/>
+
+    <rect x="325" y="525" width="150" height="58" rx="12" fill="#242424"/>
+    <text x="363" y="548" fill="#bdbdbd" font-size="13">Fan mode</text>
+    <text x="363" y="567" fill="#f0f0f0" font-size="16" font-weight="700">Quiet</text><text x="456" y="562" fill="#bdbdbd" font-size="16">⌄</text>
+    <circle cx="345" cy="556" r="4" fill="#d8d8d8"/>
+
+    <rect x="495" y="525" width="150" height="58" rx="12" fill="#242424"/>
+    <text x="533" y="548" fill="#bdbdbd" font-size="13">Swing mode</text>
+    <text x="533" y="567" fill="#f0f0f0" font-size="16" font-weight="700">Off</text><text x="626" y="562" fill="#bdbdbd" font-size="16">⌄</text>
+    <circle cx="515" cy="556" r="4" fill="#d8d8d8"/>
+  </g>
+
+  <g font-family="Inter,Arial,sans-serif" text-anchor="middle">
+    <rect x="325" y="594" width="96" height="34" rx="10" fill="#242424"/>
+    <text x="373" y="616" fill="#f0f0f0" font-size="12" font-weight="700">High power</text>
+    <rect x="432" y="594" width="96" height="34" rx="10" fill="#242424"/>
+    <text x="480" y="616" fill="#f0f0f0" font-size="12" font-weight="700">ECO</text>
+    <rect x="539" y="594" width="106" height="34" rx="10" fill="#242424"/>
+    <text x="586" y="616" fill="#f0f0f0" font-size="12" font-weight="700">Timer 60 min</text><text x="631" y="616" fill="#bdbdbd" font-size="13">⌄</text>
+  </g>
+</svg>

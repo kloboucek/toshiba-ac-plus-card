@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.1";
+var CARD_VERSION = "0.2.2";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var FEATURE_LABELS = {
@@ -126,16 +126,20 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     const range = Math.max(maxTemp - minTemp, 1);
     const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
     const dash = Math.round(390 * percent);
+    const angle = (143 + percent * 254) * Math.PI / 180;
+    const thumbX = 130 + 92 * Math.cos(angle);
+    const thumbY = 130 + 92 * Math.sin(angle);
     const mode = titleCase(entity.state);
     return `
       <div class="thermostat-shell">
         <div class="current-label">Current temperature</div>
         <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
         <div class="dial-wrap">
-          <svg class="dial" viewBox="0 0 260 260" aria-hidden="true">
+          <svg class="dial" viewBox="0 0 260 260" data-action="dial" aria-label="Drag or click to set target temperature">
+            <path class="dial-hit" d="M64 203 A92 92 0 1 1 196 203" />
             <path class="dial-track" d="M64 203 A92 92 0 1 1 196 203" />
             <path class="dial-progress" d="M64 203 A92 92 0 1 1 196 203" stroke-dasharray="${dash} 390" />
-            <circle class="dial-thumb" cx="198" cy="132" r="11" />
+            <circle class="dial-thumb" cx="${thumbX}" cy="${thumbY}" r="11" />
             <circle class="dial-dot" cx="198" cy="90" r="3" />
           </svg>
           <div class="dial-center">
@@ -166,18 +170,18 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
   renderControls() {
     const climate = this.climate;
-    const mode = titleCase(climate?.state ?? "unknown");
-    const preset = String(climate?.attributes.preset_mode ?? "None");
-    const fanMode = String(climate?.attributes.fan_mode ?? "Auto");
-    const swingMode = String(climate?.attributes.swing_mode ?? "Off");
+    const hvacModes = asStringArray(climate?.attributes.hvac_modes).filter((mode) => HVAC_MODES.includes(mode));
+    const presetModes = asStringArray(climate?.attributes.preset_modes);
+    const fanModes = asStringArray(climate?.attributes.fan_modes);
+    const swingModes = asStringArray(climate?.attributes.swing_modes);
     const highPower = this.featureEntity("high_power");
     const eco = this.featureEntity("eco");
     return `
       <div class="info-grid">
-        ${this.renderInfoTile("modeCycle", "mdi:snowflake", "Mode", mode, true)}
-        ${this.renderInfoTile("presetCycle", "mdi:circle-small", "Preset", preset, preset !== "None")}
-        ${this.renderInfoTile("fanQuiet", "mdi:circle-small", "Fan mode", fanMode, fanMode === "Quiet")}
-        ${this.renderInfoTile("swing", "mdi:circle-small", "Swing mode", swingMode, swingMode === "Swing Vertical")}
+        ${this.renderSelectTile("hvacSelect", "mdi:snowflake", "Mode", String(climate?.state ?? "off"), hvacModes.length ? hvacModes : HVAC_MODES)}
+        ${this.renderSelectTile("presetSelect", "mdi:circle-small", "Preset", String(climate?.attributes.preset_mode ?? ""), presetModes)}
+        ${this.renderSelectTile("fanSelect", "mdi:circle-small", "Fan mode", String(climate?.attributes.fan_mode ?? ""), fanModes)}
+        ${this.renderSelectTile("swingSelect", "mdi:circle-small", "Swing mode", String(climate?.attributes.swing_mode ?? ""), swingModes)}
       </div>
       <div class="extra-row">
         ${this.renderFeatureTile("high_power", highPower)}
@@ -186,13 +190,17 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       </div>
     `;
   }
-  renderInfoTile(action, icon, label, value, active) {
+  renderSelectTile(action, icon, label, value, options) {
+    const safeOptions = options.length ? options : [value || "None"];
+    const currentValue = value || safeOptions[0] || "";
     return `
-      <button class="info-tile ${active ? "active" : ""}" data-action="${action}">
+      <label class="select-tile">
         <ha-icon icon="${icon}"></ha-icon>
         <span>${label}</span>
-        <strong>${value}</strong>
-      </button>
+        <select data-action="${action}">
+          ${safeOptions.map((option) => `<option value="${option}" ${option === currentValue ? "selected" : ""}>${option ? titleCase(option) : "None"}</option>`).join("")}
+        </select>
+      </label>
     `;
   }
   renderFeatureTile(feature, entityId) {
@@ -213,16 +221,75 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   bindEvents() {
     this.querySelectorAll("[data-action]").forEach((element) => {
       const action = element.dataset.action;
-      if (element instanceof HTMLSelectElement && action === "timer") {
-        element.addEventListener("change", () => this.handleTimer(element));
+      if (element instanceof HTMLSelectElement) {
+        if (action === "timer") {
+          element.addEventListener("change", () => this.handleTimer(element));
+        } else {
+          element.addEventListener("change", () => this.handleSelect(element));
+        }
         return;
       }
       if (element instanceof HTMLInputElement && action === "temperature") {
         element.addEventListener("change", () => this.handleTemperature(element));
         return;
       }
+      if (action === "dial") {
+        element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, element));
+        return;
+      }
       element.addEventListener("click", () => this.handleAction(element));
     });
+  }
+  handleSelect(select) {
+    if (!this._hass || !this._config) return;
+    const value = select.value;
+    if (!value) return;
+    const action = select.dataset.action;
+    if (action === "hvacSelect") {
+      this._hass.callService("climate", "set_hvac_mode", { hvac_mode: value }, { entity_id: this._config.entity });
+      return;
+    }
+    if (action === "presetSelect") {
+      this._hass.callService("climate", "set_preset_mode", { preset_mode: value }, { entity_id: this._config.entity });
+      return;
+    }
+    if (action === "fanSelect") {
+      this._hass.callService("climate", "set_fan_mode", { fan_mode: value }, { entity_id: this._config.entity });
+      return;
+    }
+    if (action === "swingSelect") {
+      this._hass.callService("climate", "set_swing_mode", { swing_mode: value }, { entity_id: this._config.entity });
+    }
+  }
+  handleDialPointer(event, svg) {
+    const climate = this.climate;
+    if (!climate) return;
+    const update = (pointer) => {
+      const rect = svg.getBoundingClientRect();
+      const x = (pointer.clientX - rect.left) / rect.width * 260;
+      const y = (pointer.clientY - rect.top) / rect.height * 260;
+      let degrees = Math.atan2(y - 130, x - 130) * 180 / Math.PI;
+      if (degrees < 0) degrees += 360;
+      if (degrees < 143) degrees += 360;
+      const percent = Math.min(1, Math.max(0, (degrees - 143) / 254));
+      const minTemp = numericAttribute(climate, "min_temp", 16);
+      const maxTemp = numericAttribute(climate, "max_temp", 30);
+      const step = numericAttribute(climate, "target_temp_step", 1);
+      const raw = minTemp + percent * (maxTemp - minTemp);
+      const snapped = Math.round(raw / step) * step;
+      this.setTargetTemperature(Math.min(maxTemp, Math.max(minTemp, snapped)));
+    };
+    svg.setPointerCapture?.(event.pointerId);
+    update(event);
+    const move = (moveEvent) => update(moveEvent);
+    const stop = () => {
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", stop);
+      svg.removeEventListener("pointercancel", stop);
+    };
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", stop);
+    svg.addEventListener("pointercancel", stop);
   }
   setTargetTemperature(temperature) {
     if (!this._hass || !this._config || !Number.isFinite(temperature)) return;
@@ -371,7 +438,7 @@ var styles = `
     overflow: hidden;
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     background: var(--ha-card-background, var(--card-background-color));
-    padding: 18px 18px 24px;
+    padding: 18px 18px 28px;
     color: var(--primary-text-color);
   }
   .header {
@@ -388,10 +455,12 @@ var styles = `
   .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
   .dial-wrap { position: relative; width: min(300px, 82vw); height: 246px; margin-top: 8px; }
   .dial { width: 100%; height: 100%; overflow: visible; }
-  .dial-track, .dial-progress { fill: none; stroke-linecap: round; stroke-width: 18; }
+  .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
+  .dial-hit { stroke: transparent; stroke-width: 42; cursor: pointer; touch-action: none; }
+  .dial-track, .dial-progress { stroke-width: 18; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
-  .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; }
+  .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; pointer-events: none; }
   .dial-dot { fill: rgba(220,220,220,.65); }
   .dial-center {
     position: absolute;
@@ -416,7 +485,7 @@ var styles = `
   .round-button:active { transform: scale(.96); }
   .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
   .extra-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-  .info-tile, .tile, .timer-tile, .timer-placeholder {
+  .select-tile, .tile, .timer-tile, .timer-placeholder {
     min-height: 58px;
     border-radius: 12px;
     border: 0;
@@ -425,18 +494,30 @@ var styles = `
     cursor: pointer;
     box-shadow: none;
   }
-  .info-tile {
+  .select-tile {
     display: grid;
-    grid-template-columns: 42px 1fr;
-    grid-template-areas: "icon label" "icon value";
+    grid-template-columns: 36px 1fr;
+    grid-template-areas: "icon label" "icon select";
     align-items: center;
     text-align: left;
-    padding: 10px 12px;
+    padding: 9px 10px;
   }
-  .info-tile ha-icon { grid-area: icon; --mdc-icon-size: 18px; color: var(--secondary-text-color); justify-self: center; }
-  .info-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
-  .info-tile strong { grid-area: value; font-size: 14px; line-height: 1.1; font-weight: 700; }
-  .info-tile.active ha-icon, .tile.active ha-icon { color: var(--primary-color, #42a5f5); }
+  .select-tile ha-icon { grid-area: icon; --mdc-icon-size: 17px; color: var(--primary-color, #42a5f5); justify-self: center; }
+  .select-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
+  .select-tile select {
+    grid-area: select;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--primary-text-color);
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .select-tile select option, .timer-tile option { color: #111; }
+  .tile.active ha-icon { color: var(--primary-color, #42a5f5); }
   .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; }
   .tile ha-icon { --mdc-icon-size: 22px; color: var(--secondary-text-color); }
   .tile span { font-size: 12px; line-height: 1.1; text-align: center; }
