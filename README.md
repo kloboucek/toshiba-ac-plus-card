@@ -1,19 +1,20 @@
 # Toshiba AC Plus Card
 
-![Toshiba AC Plus Card preview with temperature slider](assets/preview-v0.1.4.svg)
+![Toshiba AC Plus Card circular thermostat preview](assets/preview-v0.2.0.svg)
 
 A Home Assistant Lovelace dashboard card for Toshiba AC units exposed through the Toshiba AC Community integration.
 
-It provides a compact climate card with practical extra controls:
+It provides a compact circular thermostat-style climate card with practical extra controls:
 
-- HVAC mode buttons
-- Swing vertical toggle
-- Fan Auto/Quiet toggle
+- Current temperature + target temperature dial
+- Plus/minus target temperature buttons
+- Mode tile
+- Preset tile
+- Fan mode tile
+- Swing mode tile
 - High power toggle
 - ECO toggle
-- Outdoor unit silent selector
-- Air purifier toggle
-- Optional native Home Assistant timer helper support
+- Optional native Home Assistant timer helper selector
 
 This is a **frontend/dashboard card only**. It does not create a second Home Assistant integration or add extra devices next to your existing Toshiba AC integration.
 
@@ -57,11 +58,9 @@ will try:
 ```text
 switch.living_room_high_power_mode
 switch.living_room_eco_mode
-select.living_room_outdoor_unit_silent_mode
-switch.living_room_air_purifier
 ```
 
-You can override any feature entity manually:
+You can override feature entities manually:
 
 ```yaml
 type: custom:toshiba-ac-plus-card
@@ -71,15 +70,13 @@ features:
   auto_detect: true
   high_power: switch.living_room_high_power_mode
   eco: switch.living_room_eco_mode
-  outdoor_silent: select.living_room_outdoor_unit_silent_mode
-  air_purifier: switch.living_room_air_purifier
 ```
 
 Disable a button by setting it to `false`:
 
 ```yaml
 features:
-  air_purifier: false
+  eco: false
 ```
 
 ## Timer support
@@ -100,7 +97,7 @@ timer:
     - 120
 ```
 
-When a duration is selected, the card calls `timer.start`. When **Off / cancel** is selected, it calls `timer.cancel`.
+When a duration is selected, the card calls `timer.start`. When **Off** is selected, it calls `timer.cancel`.
 
 ### Turning the AC off when the timer finishes
 

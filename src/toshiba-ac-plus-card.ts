@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.1.2";
+const CARD_VERSION = "0.2.0";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const FEATURE_LABELS: Record<FeatureName, { name: string; icon: string }> = {
@@ -85,6 +85,16 @@ function formatTemperature(value: number | unknown, unit: unknown): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "—";
   return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 1 })}${unit ?? "°C"}`;
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+function nextFromList(values: string[], current: unknown, fallback: string): string | undefined {
+  if (!values.length) return fallback;
+  const currentIndex = values.indexOf(String(current));
+  return values[(currentIndex + 1) % values.length] ?? fallback;
 }
 
 class ToshibaAcPlusCard extends HTMLElement {
@@ -162,7 +172,6 @@ class ToshibaAcPlusCard extends HTMLElement {
           <ha-icon icon="mdi:air-conditioner"></ha-icon>
         </div>
         ${climate ? this.renderClimate(climate) : this.renderWarning(`Entity not found: ${this._config.entity}`)}
-        ${this.renderTimer()}
         ${this.renderControls()}
       </ha-card>
       <style>${styles}</style>
@@ -176,106 +185,97 @@ class ToshibaAcPlusCard extends HTMLElement {
     const target = numericAttribute(entity, "temperature", numericAttribute(entity, "current_temperature", 22));
     const minTemp = numericAttribute(entity, "min_temp", 16);
     const maxTemp = numericAttribute(entity, "max_temp", 30);
-    const step = numericAttribute(entity, "target_temp_step", 0.5);
-    const state = entity.state;
-    const supportedModes = Array.isArray(entity.attributes.hvac_modes) ? entity.attributes.hvac_modes as string[] : HVAC_MODES;
-    const modes = HVAC_MODES.filter((mode) => supportedModes.includes(mode));
+    const range = Math.max(maxTemp - minTemp, 1);
+    const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
+    const dash = Math.round(390 * percent);
+    const mode = titleCase(entity.state);
 
     return `
-      <div class="climate-block">
-        <div class="temperatures">
-          <div>
-            <div class="big-temp">${formatTemperature(target, unit)}</div>
-            <div class="muted">Target</div>
-          </div>
-          <div class="current-temp">
-            <div>${formatTemperature(entity.attributes.current_temperature, unit)}</div>
-            <div class="muted">Current</div>
+      <div class="thermostat-shell">
+        <div class="current-label">Current temperature</div>
+        <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
+        <div class="dial-wrap">
+          <svg class="dial" viewBox="0 0 260 260" aria-hidden="true">
+            <path class="dial-track" d="M64 203 A92 92 0 1 1 196 203" />
+            <path class="dial-progress" d="M64 203 A92 92 0 1 1 196 203" stroke-dasharray="${dash} 390" />
+            <circle class="dial-thumb" cx="198" cy="132" r="11" />
+            <circle class="dial-dot" cx="198" cy="90" r="3" />
+          </svg>
+          <div class="dial-center">
+            <div class="mode-label">${mode}</div>
+            <div class="target-temp">${formatTemperature(target, unit)}</div>
           </div>
         </div>
-        <div class="temperature-control">
-          <div class="temperature-scale">
-            <span>${formatTemperature(minTemp, unit)}</span>
-            <span>${formatTemperature(maxTemp, unit)}</span>
-          </div>
-          <input
-            class="temperature-slider"
-            type="range"
-            min="${minTemp}"
-            max="${maxTemp}"
-            step="${step}"
-            value="${target}"
-            data-action="temperature"
-            aria-label="Set target temperature"
-          >
-        </div>
-        <div class="mode-grid">
-          ${modes.map((mode) => `
-            <button class="mode-button ${state === mode ? "active" : ""}" data-action="hvac" data-mode="${mode}">${titleCase(mode)}</button>
-          `).join("")}
+        <div class="temp-buttons">
+          <button class="round-button" data-action="temperatureStep" data-step="down" aria-label="Decrease temperature">−</button>
+          <button class="round-button" data-action="temperatureStep" data-step="up" aria-label="Increase temperature">+</button>
         </div>
       </div>
     `;
   }
 
-  private renderTimer(): string {
+  private renderTimerSelect(): string {
     const timer = this._config?.timer;
-    if (!timer || !timer.entity) return "";
+    if (!timer || !timer.entity) {
+      return `<div class="timer-placeholder">Timer<br><small>Disabled</small></div>`;
+    }
     const timerState = this._hass?.states[timer.entity];
     const durations = timer.durations?.length ? timer.durations : DEFAULT_DURATIONS;
-    const status = timerState ? titleCase(timerState.state) : "Timer entity missing";
     return `
-      <div class="section timer-section">
-        <div>
-          <div class="section-title">Turn-off timer</div>
-          <div class="muted">${timer.entity} · ${status}</div>
-        </div>
-        <select class="timer-select" data-action="timer" ${timerState ? "" : "disabled"}>
-          <option value="">${timerState?.state === "active" ? "Running…" : "Off"}</option>
-          ${durations.map((minutes) => `<option value="${minutes}">${minutes} min</option>`).join("")}
-          <option value="off">Off / cancel</option>
-        </select>
-      </div>
+      <select class="tile timer-tile" data-action="timer" ${timerState ? "" : "disabled"}>
+        <option value="off">Off</option>
+        ${durations.map((minutes) => `<option value="${minutes}">${minutes} min</option>`).join("")}
+      </select>
     `;
   }
 
   private renderControls(): string {
     const climate = this.climate;
-    const swingMode = climate?.attributes.swing_mode;
-    const fanMode = climate?.attributes.fan_mode;
-    const controls: string[] = [
-      this.renderClimateButton("swing", "Swing", "mdi:swap-vertical", swingMode === "Swing Vertical" ? "Vertical" : "Off", swingMode === "Swing Vertical"),
-      this.renderClimateButton("fanQuiet", "Fan quiet", "mdi:fan", fanMode?.toString() || "Auto", fanMode === "Quiet"),
-    ];
+    const mode = titleCase(climate?.state ?? "unknown");
+    const preset = String(climate?.attributes.preset_mode ?? "None");
+    const fanMode = String(climate?.attributes.fan_mode ?? "Auto");
+    const swingMode = String(climate?.attributes.swing_mode ?? "Off");
+    const highPower = this.featureEntity("high_power");
+    const eco = this.featureEntity("eco");
 
-    for (const feature of Object.keys(FEATURE_LABELS) as FeatureName[]) {
-      const entityId = this.featureEntity(feature);
-      if (!entityId) continue;
-      const entity = this._hass?.states[entityId];
-      const meta = FEATURE_LABELS[feature];
-      const disabled = !entity || entity.state === "unavailable";
-      const active = entity?.state === "on" || (feature === "outdoor_silent" && entity?.state !== "off" && entity?.state !== "unavailable");
-      controls.push(`
-        <button class="tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId}" ${disabled ? "disabled" : ""}>
-          <ha-icon icon="${meta.icon}"></ha-icon>
-          <span>${meta.name}</span>
-          ${feature === "outdoor_silent" ? `<small>${entity?.state ?? "missing"}</small>` : ""}
-        </button>
-      `);
-    }
-
-    return `<div class="control-grid">${controls.join("")}</div>`;
+    return `
+      <div class="info-grid">
+        ${this.renderInfoTile("modeCycle", "mdi:snowflake", "Mode", mode, true)}
+        ${this.renderInfoTile("presetCycle", "mdi:circle-small", "Preset", preset, preset !== "None")}
+        ${this.renderInfoTile("fanQuiet", "mdi:circle-small", "Fan mode", fanMode, fanMode === "Quiet")}
+        ${this.renderInfoTile("swing", "mdi:circle-small", "Swing mode", swingMode, swingMode === "Swing Vertical")}
+      </div>
+      <div class="extra-row">
+        ${this.renderFeatureTile("high_power", highPower)}
+        ${this.renderFeatureTile("eco", eco)}
+        ${this.renderTimerSelect()}
+      </div>
+    `;
   }
 
-  private renderClimateButton(action: string, name: string, icon: string, label: string, active: boolean): string {
+  private renderInfoTile(action: string, icon: string, label: string, value: string, active: boolean): string {
     return `
-      <button class="tile ${active ? "active" : ""}" data-action="${action}">
+      <button class="info-tile ${active ? "active" : ""}" data-action="${action}">
         <ha-icon icon="${icon}"></ha-icon>
-        <span>${name}</span>
-        <small>${label}</small>
+        <span>${label}</span>
+        <strong>${value}</strong>
       </button>
     `;
   }
+
+  private renderFeatureTile(feature: FeatureName, entityId: string | undefined): string {
+    const meta = FEATURE_LABELS[feature];
+    const entity = entityId ? this._hass?.states[entityId] : undefined;
+    const disabled = !entity || entity.state === "unavailable";
+    const active = entity?.state === "on";
+    return `
+      <button class="tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId ?? ""}" ${disabled ? "disabled" : ""}>
+        <ha-icon icon="${meta.icon}"></ha-icon>
+        <span>${meta.name}</span>
+      </button>
+    `;
+  }
+
 
   private renderWarning(message: string): string {
     return `<div class="warning">${message}</div>`;
@@ -296,11 +296,13 @@ class ToshibaAcPlusCard extends HTMLElement {
     });
   }
 
-  private handleTemperature(input: HTMLInputElement): void {
-    if (!this._hass || !this._config) return;
-    const temperature = Number(input.value);
-    if (!Number.isFinite(temperature)) return;
+  private setTargetTemperature(temperature: number): void {
+    if (!this._hass || !this._config || !Number.isFinite(temperature)) return;
     this._hass.callService("climate", "set_temperature", { temperature }, { entity_id: this._config.entity });
+  }
+
+  private handleTemperature(input: HTMLInputElement): void {
+    this.setTargetTemperature(Number(input.value));
   }
 
   private handleAction(element: HTMLElement): void {
@@ -308,6 +310,32 @@ class ToshibaAcPlusCard extends HTMLElement {
     const action = element.dataset.action;
     if (action === "hvac") {
       this._hass.callService("climate", "set_hvac_mode", { hvac_mode: element.dataset.mode }, { entity_id: this._config.entity });
+      return;
+    }
+    if (action === "temperatureStep") {
+      const climate = this.climate;
+      if (!climate) return;
+      const step = numericAttribute(climate, "target_temp_step", 1);
+      const current = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
+      const minTemp = numericAttribute(climate, "min_temp", 16);
+      const maxTemp = numericAttribute(climate, "max_temp", 30);
+      const direction = element.dataset.step === "down" ? -1 : 1;
+      const next = Math.min(maxTemp, Math.max(minTemp, current + direction * step));
+      this.setTargetTemperature(next);
+      return;
+    }
+    if (action === "modeCycle") {
+      const climate = this.climate;
+      const modes = asStringArray(climate?.attributes.hvac_modes).filter((mode) => HVAC_MODES.includes(mode));
+      const next = nextFromList(modes.length ? modes : HVAC_MODES, climate?.state, "auto");
+      if (next) this._hass.callService("climate", "set_hvac_mode", { hvac_mode: next }, { entity_id: this._config.entity });
+      return;
+    }
+    if (action === "presetCycle") {
+      const climate = this.climate;
+      const presets = asStringArray(climate?.attributes.preset_modes);
+      const next = nextFromList(presets, climate?.attributes.preset_mode, presets[0] ?? "Power 50");
+      if (next) this._hass.callService("climate", "set_preset_mode", { preset_mode: next }, { entity_id: this._config.entity });
       return;
     }
     if (action === "swing") {
@@ -340,7 +368,7 @@ class ToshibaAcPlusCard extends HTMLElement {
     const value = select.value;
     if (value === "off" || value === "") {
       this._hass.callService("timer", "cancel", undefined, { entity_id: entityId });
-      select.value = "";
+      select.value = "off";
       return;
     }
     const minutes = Number(value);
@@ -422,55 +450,83 @@ class ToshibaAcPlusCardEditor extends HTMLElement {
 
 const styles = `
   ha-card.tap-card {
-    border-radius: 18px;
+    border-radius: 24px;
     overflow: hidden;
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     background: var(--ha-card-background, var(--card-background-color));
-    padding: 14px;
+    padding: 18px;
+    color: var(--primary-text-color);
   }
-  .header, .temperatures, .timer-section {
+  .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    margin-bottom: 6px;
   }
   .title { font-size: 18px; font-weight: 700; }
   .subtitle, .muted { color: var(--secondary-text-color); font-size: 12px; }
-  .climate-block { margin-top: 14px; }
-  .big-temp { font-size: 42px; font-weight: 700; line-height: 1; }
-  .current-temp { text-align: right; font-size: 18px; }
-  .temperature-control { margin-top: 14px; }
-  .temperature-scale { display: flex; justify-content: space-between; color: var(--secondary-text-color); font-size: 11px; margin-bottom: 4px; }
-  .temperature-slider {
-    width: 100%;
-    accent-color: var(--primary-color, #42a5f5);
-    cursor: pointer;
+  .thermostat-shell { display: grid; justify-items: center; margin-top: 4px; }
+  .current-label { color: var(--secondary-text-color); font-size: 13px; font-weight: 600; }
+  .current-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
+  .dial-wrap { position: relative; width: min(300px, 82vw); height: 246px; margin-top: 8px; }
+  .dial { width: 100%; height: 100%; overflow: visible; }
+  .dial-track, .dial-progress { fill: none; stroke-linecap: round; stroke-width: 18; }
+  .dial-track { stroke: rgba(120,120,120,.16); }
+  .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
+  .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; }
+  .dial-dot { fill: rgba(220,220,220,.65); }
+  .dial-center {
+    position: absolute;
+    inset: 78px 0 auto;
+    text-align: center;
+    pointer-events: none;
   }
-  .temperature-slider::-webkit-slider-thumb { cursor: pointer; }
-  .temperature-slider::-moz-range-thumb { cursor: pointer; }
-  .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-  .mode-button, .tile, .timer-select {
-    border: 1px solid rgba(140,140,140,.22);
-    background: rgba(120,120,120,.13);
+  .mode-label { font-size: 15px; font-weight: 700; color: var(--secondary-text-color); margin-bottom: 10px; }
+  .target-temp { font-size: 58px; font-weight: 300; line-height: .95; letter-spacing: -2px; }
+  .temp-buttons { display: flex; gap: 26px; margin-top: -38px; z-index: 1; }
+  .round-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(220,220,220,.45);
+    background: transparent;
     color: var(--primary-text-color);
-    border-radius: 14px;
-    min-height: 42px;
+    font-size: 28px;
+    line-height: 1;
     cursor: pointer;
   }
-  .mode-button.active, .tile.active {
-    background: rgba(33,150,243,.28);
-    border-color: rgba(33,150,243,.55);
+  .round-button:active { transform: scale(.96); }
+  .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+  .extra-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .info-tile, .tile, .timer-tile, .timer-placeholder {
+    min-height: 58px;
+    border-radius: 12px;
+    border: 0;
+    background: rgba(120,120,120,.11);
+    color: var(--primary-text-color);
+    cursor: pointer;
+    box-shadow: none;
   }
-  .section { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(140,140,140,.18); }
-  .section-title { font-size: 13px; font-weight: 700; }
-  .timer-select { padding: 8px 10px; min-width: 120px; }
-  .control-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-  .tile { height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; }
-  .tile ha-icon { --mdc-icon-size: 24px; color: var(--secondary-text-color); }
-  .tile.active ha-icon { color: #42a5f5; }
-  .tile span { font-size: 11px; line-height: 1.15; }
-  .tile small { color: var(--secondary-text-color); font-size: 10px; text-transform: capitalize; }
+  .info-tile {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    grid-template-areas: "icon label" "icon value";
+    align-items: center;
+    text-align: left;
+    padding: 10px 12px;
+  }
+  .info-tile ha-icon { grid-area: icon; --mdc-icon-size: 20px; color: var(--secondary-text-color); }
+  .info-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
+  .info-tile strong { grid-area: value; font-size: 14px; line-height: 1.1; font-weight: 700; }
+  .info-tile.active ha-icon, .tile.active ha-icon { color: var(--primary-color, #42a5f5); }
+  .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; }
+  .tile ha-icon { --mdc-icon-size: 22px; color: var(--secondary-text-color); }
+  .tile span { font-size: 12px; line-height: 1.1; text-align: center; }
+  .tile.active { background: rgba(33,150,243,.22); }
   .tile.disabled { opacity: .35; cursor: not-allowed; }
+  .timer-tile { width: 100%; padding: 0 8px; font-size: 13px; text-align: center; }
+  .timer-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary-text-color); font-size: 12px; }
   .warning { margin-top: 14px; color: var(--error-color); }
 `;
 
