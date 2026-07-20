@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.13";
+var CARD_VERSION = "0.2.14";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
