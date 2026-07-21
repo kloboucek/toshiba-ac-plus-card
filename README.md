@@ -113,8 +113,17 @@ When a duration is selected, the card calls `timer.start` on the configured time
 A frontend card cannot reliably wait in the browser and turn the AC off later, because the browser tab may be closed. Use the included blueprint to run the final `climate.turn_off` action in Home Assistant.
 
 1. Create a Home Assistant **Timer** helper, e.g. `timer.living_room_ac_off_timer`.
-2. Import `blueprints/automation/toshiba_ac_plus_off_timer.yaml`.
-3. Create **one automation per AC unit** from the blueprint.
+2. Import the blueprint manually in Home Assistant:
+   - Go to **Settings → Automations & scenes → Blueprints**.
+   - Click **Import Blueprint**.
+   - Paste this URL:
+
+     ```text
+     https://raw.githubusercontent.com/kloboucek/toshiba-ac-plus-card/main/blueprints/automation/toshiba_ac_plus_off_timer.yaml
+     ```
+
+   HACS installs the dashboard card, but it does **not** automatically import this blueprint into Home Assistant.
+3. Create **one automation per AC unit** from the imported blueprint.
 4. Select:
    - climate entity: `climate.living_room`
    - timer entity: `timer.living_room_ac_off_timer`
