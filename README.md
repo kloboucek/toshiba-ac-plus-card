@@ -12,9 +12,9 @@ It provides a compact circular thermostat-style climate card with practical extr
 - Preset dropdown tile
 - Fan mode dropdown tile
 - Swing mode dropdown tile
-- High power toggle with centered text
+- High power toggle with centered two-line text
 - ECO toggle with centered text
-- Optional native Home Assistant timer helper selector
+- Wider timer tile with live countdown display
 
 This is a **frontend/dashboard card only**. It does not create a second Home Assistant integration or add extra devices next to your existing Toshiba AC integration.
 

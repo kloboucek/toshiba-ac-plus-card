@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.19";
+var CARD_VERSION = "0.2.20";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -379,7 +379,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     return `
       <button class="tile feature-tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId ?? ""}" ${disabled ? "disabled" : ""}>
         <ha-icon icon="${meta.icon}"></ha-icon>
-        <span>${meta.name}</span>
+        <span>${feature === "high_power" ? "High<br>power" : meta.name}</span>
       </button>
     `;
   }
@@ -878,7 +878,7 @@ var styles = `
   }
   .round-button:active { transform: scale(.96); }
   .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
-  .extra-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .extra-row { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, .72fr) minmax(0, 1.56fr); gap: 10px; margin-top: 10px; }
   .select-tile, .tile, .timer-tile, .timer-placeholder {
     min-height: 58px;
     border-radius: 12px;
@@ -945,7 +945,7 @@ var styles = `
   .tile span { font-size: 12px; line-height: 1.1; text-align: center; }
   .feature-tile { align-items: center; justify-content: center; padding: 8px; }
   .feature-tile ha-icon { display: none; }
-  .feature-tile span { font-size: 14px; line-height: 1.15; font-weight: 700; text-align: center; }
+  .feature-tile span { font-size: 14px; line-height: 1.05; font-weight: 700; text-align: center; }
   .tile.active { background: rgba(33,150,243,.22); }
   .tile.disabled { opacity: .35; cursor: not-allowed; }
   .timer-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary-text-color); font-size: 12px; }
