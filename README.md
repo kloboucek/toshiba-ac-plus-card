@@ -10,8 +10,8 @@ It provides a compact circular thermostat-style climate card with practical extr
 - Plus/minus target temperature buttons
 - Mode dropdown tile
 - Preset dropdown tile
-- Fan mode dropdown tile
-- Swing mode dropdown tile
+- Fan Mode dropdown tile
+- Swing Mode dropdown tile
 - High power toggle with centered two-line text
 - ECO toggle with centered text
 - Wider timer tile with live countdown display

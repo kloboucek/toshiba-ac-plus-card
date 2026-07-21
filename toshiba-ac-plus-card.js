@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.21";
+var CARD_VERSION = "0.2.22";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -23,7 +23,7 @@ function dialArcPath() {
   return `M${start.x.toFixed(1)} ${start.y.toFixed(1)} A${DIAL_RADIUS} ${DIAL_RADIUS} 0 1 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
 }
 var FEATURE_LABELS = {
-  high_power: { name: "High power", icon: "mdi:high-power" },
+  high_power: { name: "High Power", icon: "mdi:high-power" },
   eco: { name: "ECO", icon: "mdi:eco" },
   outdoor_silent: { name: "Outdoor silent", icon: "mdi:home-sound-in-outline" },
   air_purifier: { name: "Air purifier", icon: "mdi:air-purifier" }
@@ -338,8 +338,8 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       <div class="info-grid">
         ${this.renderSelectTile("hvacSelect", "mdi:snowflake", "Mode", String(climate?.state ?? "off"), hvacModes.length ? hvacModes : HVAC_MODES)}
         ${this.renderSelectTile("presetSelect", "mdi:circle-small", "Preset", presetValue, presetModes)}
-        ${this.renderSelectTile("fanSelect", "mdi:circle-small", "Fan mode", fanValue, fanModes)}
-        ${this.renderSelectTile("swingSelect", "mdi:circle-small", "Swing mode", swingValue, swingModes)}
+        ${this.renderSelectTile("fanSelect", "mdi:circle-small", "Fan Mode", fanValue, fanModes)}
+        ${this.renderSelectTile("swingSelect", "mdi:circle-small", "Swing Mode", swingValue, swingModes)}
       </div>
       <div class="extra-row">
         ${this.renderFeatureTile("high_power", highPower)}
@@ -380,7 +380,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     return `
       <button class="tile feature-tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId ?? ""}" ${disabled ? "disabled" : ""}>
         <ha-icon icon="${meta.icon}"></ha-icon>
-        <span>${feature === "high_power" ? "High<br>power" : meta.name}</span>
+        <span>${feature === "high_power" ? "High<br>Power" : meta.name}</span>
       </button>
     `;
   }
@@ -923,18 +923,21 @@ var styles = `
   .select-tile.disabled { opacity: .35; pointer-events: none; }
   .select-tile summary {
     display: grid;
-    grid-template-columns: 36px 1fr 18px;
-    grid-template-areas: "icon label chevron" "icon value chevron";
+    grid-template-columns: 36px 1fr;
+    grid-template-areas: "icon label" "icon value";
     align-items: center;
     min-height: 58px;
     padding: 9px 10px;
+    border-radius: 12px;
     list-style: none;
+    transition: background .15s ease;
   }
   .select-tile summary::-webkit-details-marker { display: none; }
-  .select-tile summary::after { content: "\u2304"; grid-area: chevron; color: var(--secondary-text-color); justify-self: end; font-size: 16px; }
-  .select-tile[open] summary::after { transform: rotate(180deg); }
+  .select-tile summary:hover,
+  .select-tile summary:active,
+  .select-tile[open] summary { background: rgba(255, 213, 79, .18); }
   .select-tile ha-icon { grid-area: icon; --mdc-icon-size: 17px; color: var(--primary-color, #42a5f5); justify-self: center; }
-  .select-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 12px; line-height: 1.1; }
+  .select-tile span { grid-area: label; color: var(--secondary-text-color); font-size: 15px; line-height: 1.1; }
   .select-tile strong { grid-area: value; color: var(--primary-text-color); font-size: 14px; line-height: 1.1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .select-menu {
     position: absolute;
