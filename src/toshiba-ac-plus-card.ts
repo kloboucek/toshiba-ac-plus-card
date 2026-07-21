@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.18";
+const CARD_VERSION = "0.2.19";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -104,6 +104,17 @@ function durationToTime(minutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
 }
 
+function formatTimerSeconds(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 function numericAttribute(entity: HassEntity, key: string, fallback: number): number {
   const value = Number(entity.attributes[key]);
   return Number.isFinite(value) ? value : fallback;
@@ -132,6 +143,7 @@ class ToshibaAcPlusCard extends HTMLElement {
   private _dragTemperature?: number;
   private _optimisticTemperature?: number;
   private _optimisticTemperatureTimer?: number;
+  private _timerTickInterval?: number;
   private _pendingPresetMode?: string;
   private _pendingFanMode?: string;
   private _pendingSwingMode?: string;
@@ -165,6 +177,10 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   getCardSize(): number {
     return 8;
+  }
+
+  disconnectedCallback(): void {
+    this.stopTimerTicker();
   }
 
   static getStubConfig(hass: HomeAssistant): Partial<ToshibaAcPlusCardConfig> {
@@ -288,6 +304,53 @@ class ToshibaAcPlusCard extends HTMLElement {
     `;
 
     this.bindEvents();
+    this.syncTimerTicker();
+  }
+
+  private timerCountdownDisplay(timerState: HassEntity | undefined): string {
+    if (timerState?.state !== "active") return "Off";
+    const finishesAt = timerState.attributes.finishes_at;
+    if (typeof finishesAt === "string") {
+      const finishMs = Date.parse(finishesAt);
+      if (Number.isFinite(finishMs)) {
+        return formatTimerSeconds((finishMs - Date.now()) / 1000);
+      }
+    }
+    const remaining = timerState.attributes.remaining;
+    if (typeof remaining === "string") {
+      const parts = remaining.split(":").map((part) => Number(part));
+      if (parts.length === 3 && parts.every(Number.isFinite)) {
+        return formatTimerSeconds(parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      }
+    }
+    return "Running";
+  }
+
+  private updateTimerDisplay(): void {
+    const timer = this._config?.timer;
+    const timerState = timer && timer.entity ? this._hass?.states[timer.entity] : undefined;
+    const displayElement = this.querySelector<HTMLElement>('[data-display-role="timer-display"]');
+    if (displayElement) displayElement.textContent = this.timerCountdownDisplay(timerState);
+    if (timerState?.state !== "active") this.stopTimerTicker();
+  }
+
+  private stopTimerTicker(): void {
+    if (this._timerTickInterval === undefined) return;
+    window.clearInterval(this._timerTickInterval);
+    this._timerTickInterval = undefined;
+  }
+
+  private syncTimerTicker(): void {
+    const timer = this._config?.timer;
+    const timerState = timer && timer.entity ? this._hass?.states[timer.entity] : undefined;
+    if (timerState?.state === "active") {
+      this.updateTimerDisplay();
+      if (this._timerTickInterval === undefined) {
+        this._timerTickInterval = window.setInterval(() => this.updateTimerDisplay(), 1000);
+      }
+      return;
+    }
+    this.stopTimerTicker();
   }
 
   private renderClimate(entity: HassEntity): string {
@@ -341,7 +404,7 @@ class ToshibaAcPlusCard extends HTMLElement {
     const durations = timer.durations?.length ? timer.durations : DEFAULT_DURATIONS;
     const options = ["off", ...durations.map((minutes) => String(minutes))];
     const current = timerState?.state === "active" ? "active" : "off";
-    return this.renderDropdownTile("timer", "mdi:timer-outline", "Timer", current === "active" ? "Running" : "Off", options, timerState ? "" : "disabled");
+    return this.renderDropdownTile("timer", "mdi:timer-outline", "Timer", current === "active" ? this.timerCountdownDisplay(timerState) : "Off", options, timerState ? "" : "disabled");
   }
 
   private renderControls(): string {
@@ -385,7 +448,7 @@ class ToshibaAcPlusCard extends HTMLElement {
         <summary>
           <ha-icon icon="${icon}"></ha-icon>
           <span>${label}</span>
-          <strong>${escapeHtml(display)}</strong>
+          <strong data-display-role="${action}-display">${escapeHtml(display)}</strong>
         </summary>
         <div class="select-menu">
           ${options.map((option) => {

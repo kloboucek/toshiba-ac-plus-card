@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.18";
+var CARD_VERSION = "0.2.19";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -56,6 +56,16 @@ function durationToTime(minutes) {
   const mins = minutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
 }
+function formatTimerSeconds(totalSeconds) {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor(seconds % 3600 / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
 function numericAttribute(entity, key, fallback) {
   const value = Number(entity.attributes[key]);
   return Number.isFinite(value) ? value : fallback;
@@ -105,6 +115,9 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
   getCardSize() {
     return 8;
+  }
+  disconnectedCallback() {
+    this.stopTimerTicker();
   }
   static getStubConfig(hass) {
     const climate = Object.keys(hass.states).find((entity2) => entity2.startsWith("climate."));
@@ -213,6 +226,49 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       <style>${styles}</style>
     `;
     this.bindEvents();
+    this.syncTimerTicker();
+  }
+  timerCountdownDisplay(timerState) {
+    if (timerState?.state !== "active") return "Off";
+    const finishesAt = timerState.attributes.finishes_at;
+    if (typeof finishesAt === "string") {
+      const finishMs = Date.parse(finishesAt);
+      if (Number.isFinite(finishMs)) {
+        return formatTimerSeconds((finishMs - Date.now()) / 1e3);
+      }
+    }
+    const remaining = timerState.attributes.remaining;
+    if (typeof remaining === "string") {
+      const parts = remaining.split(":").map((part) => Number(part));
+      if (parts.length === 3 && parts.every(Number.isFinite)) {
+        return formatTimerSeconds(parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      }
+    }
+    return "Running";
+  }
+  updateTimerDisplay() {
+    const timer = this._config?.timer;
+    const timerState = timer && timer.entity ? this._hass?.states[timer.entity] : void 0;
+    const displayElement = this.querySelector('[data-display-role="timer-display"]');
+    if (displayElement) displayElement.textContent = this.timerCountdownDisplay(timerState);
+    if (timerState?.state !== "active") this.stopTimerTicker();
+  }
+  stopTimerTicker() {
+    if (this._timerTickInterval === void 0) return;
+    window.clearInterval(this._timerTickInterval);
+    this._timerTickInterval = void 0;
+  }
+  syncTimerTicker() {
+    const timer = this._config?.timer;
+    const timerState = timer && timer.entity ? this._hass?.states[timer.entity] : void 0;
+    if (timerState?.state === "active") {
+      this.updateTimerDisplay();
+      if (this._timerTickInterval === void 0) {
+        this._timerTickInterval = window.setInterval(() => this.updateTimerDisplay(), 1e3);
+      }
+      return;
+    }
+    this.stopTimerTicker();
   }
   renderClimate(entity) {
     const unit = entity.attributes.temperature_unit ?? "\xB0C";
@@ -263,7 +319,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     const durations = timer.durations?.length ? timer.durations : DEFAULT_DURATIONS;
     const options = ["off", ...durations.map((minutes) => String(minutes))];
     const current = timerState?.state === "active" ? "active" : "off";
-    return this.renderDropdownTile("timer", "mdi:timer-outline", "Timer", current === "active" ? "Running" : "Off", options, timerState ? "" : "disabled");
+    return this.renderDropdownTile("timer", "mdi:timer-outline", "Timer", current === "active" ? this.timerCountdownDisplay(timerState) : "Off", options, timerState ? "" : "disabled");
   }
   renderControls() {
     const climate = this.climate;
@@ -303,7 +359,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         <summary>
           <ha-icon icon="${icon}"></ha-icon>
           <span>${label}</span>
-          <strong>${escapeHtml(display)}</strong>
+          <strong data-display-role="${action}-display">${escapeHtml(display)}</strong>
         </summary>
         <div class="select-menu">
           ${options.map((option) => {

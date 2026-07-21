@@ -97,7 +97,7 @@ timer:
     - 120
 ```
 
-When a duration is selected, the card calls `timer.start`. When **Off** is selected, it calls `timer.cancel`.
+When a duration is selected, the card calls `timer.start`. While the timer is active, the Timer tile shows the live countdown directly in the button. When **Off** is selected, it calls `timer.cancel`.
 
 ### Turning the AC off when the timer finishes
 
