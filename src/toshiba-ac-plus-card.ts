@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.22";
+const CARD_VERSION = "0.4.0";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
