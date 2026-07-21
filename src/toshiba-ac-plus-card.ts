@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.17";
+const CARD_VERSION = "0.2.18";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -404,7 +404,7 @@ class ToshibaAcPlusCard extends HTMLElement {
     const disabled = !entity || entity.state === "unavailable";
     const active = entity?.state === "on";
     return `
-      <button class="tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId ?? ""}" ${disabled ? "disabled" : ""}>
+      <button class="tile feature-tile ${active ? "active" : ""} ${disabled ? "disabled" : ""}" data-action="feature" data-feature="${feature}" data-entity="${entityId ?? ""}" ${disabled ? "disabled" : ""}>
         <ha-icon icon="${meta.icon}"></ha-icon>
         <span>${meta.name}</span>
       </button>
@@ -998,6 +998,9 @@ const styles = `
   .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; }
   .tile ha-icon { --mdc-icon-size: 22px; color: var(--secondary-text-color); }
   .tile span { font-size: 12px; line-height: 1.1; text-align: center; }
+  .feature-tile { align-items: center; justify-content: center; padding: 8px; }
+  .feature-tile ha-icon { display: none; }
+  .feature-tile span { font-size: 14px; line-height: 1.15; font-weight: 700; text-align: center; }
   .tile.active { background: rgba(33,150,243,.22); }
   .tile.disabled { opacity: .35; cursor: not-allowed; }
   .timer-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary-text-color); font-size: 12px; }
