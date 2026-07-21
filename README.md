@@ -83,6 +83,13 @@ features:
 
 The card can start/cancel a native Home Assistant `timer` helper. This keeps the UI simple while Home Assistant handles the actual countdown.
 
+For each AC unit you want to use with the off timer, the current setup needs:
+
+- **one Timer helper** — e.g. `timer.living_room_ac_off_timer`
+- **one automation from the included blueprint** — turns that AC off when the timer finishes
+
+You do **not** need a separate duration helper such as `input_number`, `input_select`, or an "AC off timer duration" helper. You also do **not** need a separate "duration changed" automation. The card sends the selected duration directly to Home Assistant by calling `timer.start` with the chosen duration.
+
 ```yaml
 type: custom:toshiba-ac-plus-card
 entity: climate.living_room
@@ -97,18 +104,22 @@ timer:
     - 120
 ```
 
-When a duration is selected, the card calls `timer.start`. While the timer is active, the Timer tile shows the live countdown directly in the button. When **Off** is selected, it calls `timer.cancel`.
+`durations` are shown in the Timer dropdown in minutes. If omitted, the default choices are `15`, `30`, `60`, `90`, and `120` minutes.
+
+When a duration is selected, the card calls `timer.start` on the configured timer helper. While the timer is active, the Timer tile shows the live countdown directly in the button. When **Off** is selected, it calls `timer.cancel`.
 
 ### Turning the AC off when the timer finishes
 
 A frontend card cannot reliably wait in the browser and turn the AC off later, because the browser tab may be closed. Use the included blueprint to run the final `climate.turn_off` action in Home Assistant.
 
-1. Create a Home Assistant timer helper, e.g. `timer.living_room_ac_off_timer`.
+1. Create a Home Assistant **Timer** helper, e.g. `timer.living_room_ac_off_timer`.
 2. Import `blueprints/automation/toshiba_ac_plus_off_timer.yaml`.
-3. Create one automation per AC unit from the blueprint.
+3. Create **one automation per AC unit** from the blueprint.
 4. Select:
    - climate entity: `climate.living_room`
    - timer entity: `timer.living_room_ac_off_timer`
+
+That is enough for the card's Timer function. If you previously created an extra duration helper and a duration-change automation for the same AC, those are not required by this card and can usually be removed after confirming no other dashboard/automation still uses them.
 
 ## Multi-room example
 
