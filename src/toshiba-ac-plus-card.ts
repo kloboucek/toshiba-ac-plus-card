@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.15";
+const CARD_VERSION = "0.2.16";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -655,6 +655,10 @@ class ToshibaAcPlusCard extends HTMLElement {
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", stop, { passive: false });
     window.addEventListener("touchcancel", stop, { passive: false });
+    if (dialHit === "thumb") {
+      event.preventDefault();
+      startDialGesture(touch);
+    }
   }
 
 
@@ -870,7 +874,7 @@ const styles = `
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
-  .dial-thumb-hit { fill: transparent; cursor: pointer; pointer-events: all; touch-action: pan-y; }
+  .dial-thumb-hit { fill: transparent; cursor: pointer; pointer-events: all; touch-action: none; }
   .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; pointer-events: none; }
   .dial-dot { fill: rgba(220,220,220,.65); }
   .dial-center {
