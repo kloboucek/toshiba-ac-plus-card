@@ -1,6 +1,6 @@
 {
   "name": "toshiba-ac-plus-card",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "A Home Assistant Lovelace card for Toshiba AC extra controls and off-timer support.",
   "type": "module",
   "scripts": {

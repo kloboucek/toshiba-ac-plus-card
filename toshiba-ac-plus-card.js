@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.14";
+var CARD_VERSION = "0.2.15";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -8,7 +8,8 @@ var DIAL_RADIUS = 118;
 var DIAL_START_DEGREES = 140;
 var DIAL_SWEEP_DEGREES = 260;
 var DIAL_ARC_LENGTH = Math.round(DIAL_RADIUS * DIAL_SWEEP_DEGREES * Math.PI / 180);
-var DIAL_HIT_TOLERANCE = 18;
+var DIAL_HIT_TOLERANCE = 30;
+var DIAL_THUMB_HIT_RADIUS = 34;
 function dialPoint(percent) {
   const angle = (DIAL_START_DEGREES + percent * DIAL_SWEEP_DEGREES) * Math.PI / 180;
   return {
@@ -210,9 +211,10 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         <div class="current-value">${formatTemperature(entity.attributes.current_temperature, unit)}</div>
         <div class="dial-wrap">
           <svg class="dial" viewBox="0 0 320 320" aria-label="Drag or click to set target temperature">
-            <path class="dial-hit" d="${arcPath}" data-action="dial" />
+            <path class="dial-hit" d="${arcPath}" data-action="dial" data-dial-hit="arc" />
             <path class="dial-track" d="${arcPath}" />
             <path class="dial-progress" d="${arcPath}" stroke-dasharray="${dash} ${DIAL_ARC_LENGTH}" />
+            <circle class="dial-thumb-hit" cx="${thumb.x}" cy="${thumb.y}" r="${DIAL_THUMB_HIT_RADIUS}" data-action="dial" data-dial-hit="thumb" />
             <circle class="dial-thumb" cx="${thumb.x}" cy="${thumb.y}" r="13" />
             <circle class="dial-dot" cx="${dot.x}" cy="${dot.y}" r="4" />
           </svg>
@@ -330,8 +332,9 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       if (action === "dial") {
         const svg = element.closest("svg");
         if (!svg) return;
-        element.addEventListener("touchstart", (event) => this.handleDialTouch(event, svg), { passive: false });
-        element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, svg));
+        const dialHit = element.dataset.dialHit === "thumb" ? "thumb" : "arc";
+        element.addEventListener("touchstart", (event) => this.handleDialTouch(event, svg, dialHit), { passive: false });
+        element.addEventListener("pointerdown", (event) => this.handleDialPointer(event, svg, dialHit));
         return;
       }
       element.addEventListener("click", () => this.handleAction(element));
@@ -449,10 +452,10 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     const target = this.querySelector('[data-role="target-temp"]');
     if (target) target.textContent = formatTemperature(temperature, unit);
   }
-  handleDialPointer(event, svg) {
+  handleDialPointer(event, svg, dialHit) {
     const climate = this.climate;
     if (event.pointerType === "touch") return;
-    if (!climate || this._isDraggingDial || !this.isClientOnDialArc(svg, event.clientX, event.clientY)) return;
+    if (!climate || this._isDraggingDial || dialHit === "arc" && !this.isClientOnDialArc(svg, event.clientX, event.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const minTemp = numericAttribute(climate, "min_temp", 16);
     const maxTemp = numericAttribute(climate, "max_temp", 30);
@@ -486,10 +489,10 @@ var ToshibaAcPlusCard = class extends HTMLElement {
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
   }
-  handleDialTouch(event, svg) {
+  handleDialTouch(event, svg, dialHit) {
     const climate = this.climate;
     const touch = event.changedTouches[0];
-    if (!climate || !touch || this._isDraggingDial || !this.isClientOnDialArc(svg, touch.clientX, touch.clientY)) return;
+    if (!climate || !touch || this._isDraggingDial || dialHit === "arc" && !this.isClientOnDialArc(svg, touch.clientX, touch.clientY)) return;
     let pendingTemperature = numericAttribute(climate, "temperature", numericAttribute(climate, "current_temperature", 22));
     const touchId = touch.identifier;
     const startClientX = touch.clientX;
@@ -549,7 +552,8 @@ var ToshibaAcPlusCard = class extends HTMLElement {
         this._dragTemperature = void 0;
         return;
       }
-      if (!dialGestureStarted && activeTouch) startDialGesture(activeTouch);
+      if (!dialGestureStarted && activeTouch && dialHit === "arc") startDialGesture(activeTouch);
+      if (!dialGestureStarted) return;
       endEvent.preventDefault();
       this._isDraggingDial = false;
       this._dragTemperature = void 0;
@@ -756,10 +760,11 @@ var styles = `
   .dial-wrap { position: relative; width: min(320px, 100%); height: 306px; margin-top: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .dial { width: 100%; height: 100%; overflow: visible; pointer-events: none; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .dial-hit, .dial-track, .dial-progress { fill: none; stroke-linecap: round; }
-  .dial-hit { stroke: transparent; stroke-width: 36; cursor: pointer; pointer-events: stroke; touch-action: pan-y; }
+  .dial-hit { stroke: transparent; stroke-width: 60; cursor: pointer; pointer-events: stroke; touch-action: pan-y; }
   .dial-track, .dial-progress { stroke-width: 24; pointer-events: none; }
   .dial-track { stroke: rgba(120,120,120,.16); }
   .dial-progress { stroke: var(--primary-color, #2196f3); filter: drop-shadow(0 0 4px rgba(33,150,243,.25)); }
+  .dial-thumb-hit { fill: transparent; cursor: pointer; pointer-events: all; touch-action: pan-y; }
   .dial-thumb { fill: #e3f2fd; stroke: var(--primary-color, #2196f3); stroke-width: 4; pointer-events: none; }
   .dial-dot { fill: rgba(220,220,220,.65); }
   .dial-center {
