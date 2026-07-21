@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.16";
+const CARD_VERSION = "0.2.17";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -130,6 +130,8 @@ class ToshibaAcPlusCard extends HTMLElement {
   private _config?: ToshibaAcPlusCardConfig;
   private _isDraggingDial = false;
   private _dragTemperature?: number;
+  private _optimisticTemperature?: number;
+  private _optimisticTemperatureTimer?: number;
   private _pendingPresetMode?: string;
   private _pendingFanMode?: string;
   private _pendingSwingMode?: string;
@@ -148,6 +150,13 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   set hass(hass: HomeAssistant) {
     this._hass = hass;
+    const climate = this.climate;
+    if (climate && this._optimisticTemperature !== undefined) {
+      const stateTarget = numericAttribute(climate, "temperature", Number.NaN);
+      if (Number.isFinite(stateTarget) && Math.abs(stateTarget - this._optimisticTemperature) < 0.01) {
+        this.clearOptimisticTemperature(false);
+      }
+    }
     if (this._isDraggingDial || this.querySelector("details[open]")) {
       return;
     }
@@ -222,6 +231,25 @@ class ToshibaAcPlusCard extends HTMLElement {
     this.savePendingSettings();
   }
 
+  private clearOptimisticTemperature(render = true): void {
+    this._optimisticTemperature = undefined;
+    if (this._optimisticTemperatureTimer !== undefined) {
+      window.clearTimeout(this._optimisticTemperatureTimer);
+      this._optimisticTemperatureTimer = undefined;
+    }
+    if (render) this.render();
+  }
+
+  private holdOptimisticTemperature(temperature: number): void {
+    this._optimisticTemperature = temperature;
+    if (this._optimisticTemperatureTimer !== undefined) {
+      window.clearTimeout(this._optimisticTemperatureTimer);
+    }
+    this._optimisticTemperatureTimer = window.setTimeout(() => {
+      this.clearOptimisticTemperature();
+    }, 8000);
+  }
+
   private featureEntity(feature: FeatureName): string | undefined {
     const config = this._config;
     if (!config) return undefined;
@@ -267,7 +295,7 @@ class ToshibaAcPlusCard extends HTMLElement {
     const stateTarget = numericAttribute(entity, "temperature", numericAttribute(entity, "current_temperature", 22));
     const minTemp = numericAttribute(entity, "min_temp", 16);
     const maxTemp = numericAttribute(entity, "max_temp", 30);
-    const target = this._dragTemperature ?? stateTarget;
+    const target = this._dragTemperature ?? this._optimisticTemperature ?? stateTarget;
     const currentTemperature = numericAttribute(entity, "current_temperature", target);
     const range = Math.max(maxTemp - minTemp, 1);
     const percent = Math.min(1, Math.max(0, (target - minTemp) / range));
@@ -542,6 +570,9 @@ class ToshibaAcPlusCard extends HTMLElement {
     const thumb = svg.querySelector<SVGCircleElement>(".dial-thumb");
     thumb?.setAttribute("cx", String(thumbPoint.x));
     thumb?.setAttribute("cy", String(thumbPoint.y));
+    const thumbHit = svg.querySelector<SVGCircleElement>(".dial-thumb-hit");
+    thumbHit?.setAttribute("cx", String(thumbPoint.x));
+    thumbHit?.setAttribute("cy", String(thumbPoint.y));
     const target = this.querySelector<HTMLElement>('[data-role="target-temp"]');
     if (target) target.textContent = formatTemperature(temperature, unit);
   }
@@ -664,7 +695,10 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   private setTargetTemperature(temperature: number): void {
     if (!this._hass || !this._config || !Number.isFinite(temperature)) return;
-    this._hass.callService("climate", "set_temperature", { temperature }, { entity_id: this._config.entity });
+    this.holdOptimisticTemperature(temperature);
+    this.render();
+    this._hass.callService("climate", "set_temperature", { temperature }, { entity_id: this._config.entity })
+      .catch(() => this.clearOptimisticTemperature());
   }
 
   private handleTemperature(input: HTMLInputElement): void {
