@@ -139,7 +139,7 @@ cards:
 - This card does not install or configure the Toshiba AC Community integration.
 - Some Toshiba feature entities are unavailable when the AC is off or in an incompatible mode. The card greys those controls out.
 - If entity names differ from the auto-detected pattern, configure the feature entities manually.
-- Mode, Preset, Fan mode, Swing mode, and Timer use styled in-card dropdown menus. The card pauses live re-rendering while a dropdown is open so menus do not disappear before selection; all menus open upward from their tile.
+- Mode, Preset, Fan mode, Swing mode, and Timer use styled in-card dropdown menus. The card pauses live re-rendering while a dropdown is open so menus do not disappear before selection; all menus open upward from their tile and close when the user taps/clicks elsewhere on the dashboard.
 - When the climate entity is off, Preset, Fan mode, and Swing mode selections are held locally and persisted in browser localStorage per climate entity. They survive dashboard switches/page refreshes in the same browser and are applied only after the user turns the AC on via the main Mode dropdown.
 - The visual config editor keeps HA entity pickers mounted during live HA updates, so the climate/timer search dropdowns stay stable while typing.
 - When the selected climate entity changes in the visual editor, the default card name follows the new entity unless the name was manually customized.

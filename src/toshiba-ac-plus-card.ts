@@ -37,7 +37,7 @@ type ToshibaAcPlusCardConfig = {
   timer?: TimerConfig | false;
 };
 
-const CARD_VERSION = "0.2.20";
+const CARD_VERSION = "0.2.21";
 const DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 const HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 const PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -144,6 +144,7 @@ class ToshibaAcPlusCard extends HTMLElement {
   private _optimisticTemperature?: number;
   private _optimisticTemperatureTimer?: number;
   private _timerTickInterval?: number;
+  private _outsideDropdownListener?: (event: PointerEvent) => void;
   private _pendingPresetMode?: string;
   private _pendingFanMode?: string;
   private _pendingSwingMode?: string;
@@ -181,6 +182,7 @@ class ToshibaAcPlusCard extends HTMLElement {
 
   disconnectedCallback(): void {
     this.stopTimerTicker();
+    this.detachOutsideDropdownListener();
   }
 
   static getStubConfig(hass: HomeAssistant): Partial<ToshibaAcPlusCardConfig> {
@@ -482,10 +484,14 @@ class ToshibaAcPlusCard extends HTMLElement {
   private bindEvents(): void {
     this.querySelectorAll<HTMLDetailsElement>("details[data-dropdown]").forEach((details) => {
       details.addEventListener("toggle", () => {
-        if (!details.open) return;
+        if (!details.open) {
+          if (!this.querySelector("details[data-dropdown][open]")) this.detachOutsideDropdownListener();
+          return;
+        }
         this.querySelectorAll<HTMLDetailsElement>("details[data-dropdown][open]").forEach((other) => {
           if (other !== details) other.removeAttribute("open");
         });
+        this.attachOutsideDropdownListener();
       });
     });
     this.querySelectorAll<HTMLElement>("[data-action]").forEach((element) => {
@@ -512,6 +518,28 @@ class ToshibaAcPlusCard extends HTMLElement {
       }
       element.addEventListener("click", () => this.handleAction(element));
     });
+  }
+
+  private attachOutsideDropdownListener(): void {
+    if (this._outsideDropdownListener) return;
+    this._outsideDropdownListener = (event: PointerEvent): void => {
+      const openDropdowns = Array.from(this.querySelectorAll<HTMLDetailsElement>("details[data-dropdown][open]"));
+      if (!openDropdowns.length) {
+        this.detachOutsideDropdownListener();
+        return;
+      }
+      const path = event.composedPath();
+      if (openDropdowns.some((details) => path.includes(details))) return;
+      openDropdowns.forEach((details) => details.removeAttribute("open"));
+      this.detachOutsideDropdownListener();
+    };
+    document.addEventListener("pointerdown", this._outsideDropdownListener, true);
+  }
+
+  private detachOutsideDropdownListener(): void {
+    if (!this._outsideDropdownListener) return;
+    document.removeEventListener("pointerdown", this._outsideDropdownListener, true);
+    this._outsideDropdownListener = undefined;
   }
 
   private handleDropdownOption(element: HTMLElement): void {

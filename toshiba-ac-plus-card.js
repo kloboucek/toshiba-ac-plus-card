@@ -1,5 +1,5 @@
 // src/toshiba-ac-plus-card.ts
-var CARD_VERSION = "0.2.20";
+var CARD_VERSION = "0.2.21";
 var DEFAULT_DURATIONS = [15, 30, 60, 90, 120];
 var HVAC_MODES = ["off", "auto", "cool", "heat", "dry", "fan_only"];
 var PENDING_STORAGE_PREFIX = "toshiba-ac-plus-card:pending:";
@@ -118,6 +118,7 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   }
   disconnectedCallback() {
     this.stopTimerTicker();
+    this.detachOutsideDropdownListener();
   }
   static getStubConfig(hass) {
     const climate = Object.keys(hass.states).find((entity2) => entity2.startsWith("climate."));
@@ -389,10 +390,14 @@ var ToshibaAcPlusCard = class extends HTMLElement {
   bindEvents() {
     this.querySelectorAll("details[data-dropdown]").forEach((details) => {
       details.addEventListener("toggle", () => {
-        if (!details.open) return;
+        if (!details.open) {
+          if (!this.querySelector("details[data-dropdown][open]")) this.detachOutsideDropdownListener();
+          return;
+        }
         this.querySelectorAll("details[data-dropdown][open]").forEach((other) => {
           if (other !== details) other.removeAttribute("open");
         });
+        this.attachOutsideDropdownListener();
       });
     });
     this.querySelectorAll("[data-action]").forEach((element) => {
@@ -419,6 +424,26 @@ var ToshibaAcPlusCard = class extends HTMLElement {
       }
       element.addEventListener("click", () => this.handleAction(element));
     });
+  }
+  attachOutsideDropdownListener() {
+    if (this._outsideDropdownListener) return;
+    this._outsideDropdownListener = (event) => {
+      const openDropdowns = Array.from(this.querySelectorAll("details[data-dropdown][open]"));
+      if (!openDropdowns.length) {
+        this.detachOutsideDropdownListener();
+        return;
+      }
+      const path = event.composedPath();
+      if (openDropdowns.some((details) => path.includes(details))) return;
+      openDropdowns.forEach((details) => details.removeAttribute("open"));
+      this.detachOutsideDropdownListener();
+    };
+    document.addEventListener("pointerdown", this._outsideDropdownListener, true);
+  }
+  detachOutsideDropdownListener() {
+    if (!this._outsideDropdownListener) return;
+    document.removeEventListener("pointerdown", this._outsideDropdownListener, true);
+    this._outsideDropdownListener = void 0;
   }
   handleDropdownOption(element) {
     if (!this._hass || !this._config) return;
