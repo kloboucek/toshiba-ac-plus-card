@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="760" viewBox="0 0 960 760" role="img" aria-label="Toshiba AC Plus Card 0.4.0 beta preview">
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="760" fill="#151515"/>
+  <rect x="275" y="28" width="410" height="704" rx="26" fill="#1c1c1c" stroke="#2b2b2b" filter="url(#softShadow)"/>
+
+  <text x="480" y="72" fill="#bdbdbd" font-family="Inter,Arial,sans-serif" font-size="17" text-anchor="middle" font-weight="700">Current temperature</text>
+  <text x="480" y="108" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="27" text-anchor="middle" font-weight="700">27 °C</text>
+
+  <path d="M357 371 A150 150 0 1 1 603 371" fill="none" stroke="#262626" stroke-width="30" stroke-linecap="round"/>
+  <path d="M603 371 A150 150 0 0 0 628 271" fill="none" stroke="#1e88d7" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="628" cy="271" r="18" fill="#e3f2fd" stroke="#42a5f5" stroke-width="5"/>
+  <circle cx="620" cy="215" r="5" fill="#8f8f8f"/>
+
+  <text x="480" y="228" fill="#dedede" font-family="Inter,Arial,sans-serif" font-size="20" text-anchor="middle" font-weight="700">Cool</text>
+  <text x="480" y="328" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="76" text-anchor="middle" font-weight="300">24<tspan font-size="24"> °C</tspan></text>
+
+  <circle cx="437" cy="394" r="28" fill="none" stroke="#777"/>
+  <text x="437" y="403" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="middle">−</text>
+  <circle cx="523" cy="394" r="28" fill="none" stroke="#777"/>
+  <text x="523" y="403" fill="#f5f5f5" font-family="Inter,Arial,sans-serif" font-size="30" text-anchor="middle">+</text>
+
+  <g font-family="Inter,Arial,sans-serif">
+    <rect x="315" y="455" width="155" height="58" rx="12" fill="#242424"/>
+    <text x="353" y="477" fill="#bdbdbd" font-size="15">Mode</text>
+    <text x="353" y="498" fill="#f0f0f0" font-size="16" font-weight="700">Cool</text>
+    <text x="334" y="491" fill="#42a5f5" font-size="19">❄</text>
+
+    <rect x="490" y="455" width="155" height="58" rx="12" fill="#2d2a20" stroke="#ffd54f" stroke-opacity="0.28"/>
+    <text x="528" y="477" fill="#bdbdbd" font-size="15">Preset</text>
+    <text x="528" y="498" fill="#f0f0f0" font-size="16" font-weight="700">Power 50</text>
+    <circle cx="510" cy="486" r="4" fill="#42a5f5"/>
+
+    <rect x="315" y="525" width="155" height="58" rx="12" fill="#242424"/>
+    <text x="353" y="547" fill="#bdbdbd" font-size="15">Fan Mode</text>
+    <text x="353" y="568" fill="#f0f0f0" font-size="16" font-weight="700">Quiet</text>
+    <circle cx="335" cy="556" r="4" fill="#42a5f5"/>
+
+    <rect x="490" y="525" width="155" height="58" rx="12" fill="#242424"/>
+    <text x="528" y="547" fill="#bdbdbd" font-size="15">Swing Mode</text>
+    <text x="528" y="568" fill="#f0f0f0" font-size="16" font-weight="700">Off</text>
+    <circle cx="510" cy="556" r="4" fill="#42a5f5"/>
+  </g>
+
+  <g font-family="Inter,Arial,sans-serif" text-anchor="middle">
+    <rect x="315" y="595" width="78" height="58" rx="12" fill="#242424"/>
+    <text x="354" y="619" fill="#f0f0f0" font-size="14" font-weight="700">High</text>
+    <text x="354" y="635" fill="#f0f0f0" font-size="14" font-weight="700">Power</text>
+
+    <rect x="403" y="595" width="78" height="58" rx="12" fill="#242424"/>
+    <text x="442" y="629" fill="#f0f0f0" font-size="14" font-weight="700">ECO</text>
+
+    <rect x="491" y="595" width="154" height="58" rx="12" fill="#242424"/>
+    <text x="529" y="617" fill="#bdbdbd" font-size="15" text-anchor="start">Timer</text>
+    <text x="529" y="638" fill="#f0f0f0" font-size="16" font-weight="700" text-anchor="start">42:17</text>
+    <text x="510" y="631" fill="#42a5f5" font-size="19">◷</text>
+  </g>
+
+  <text x="480" y="704" fill="#777" font-family="Inter,Arial,sans-serif" font-size="13" text-anchor="middle">v0.4.0 beta</text>
+</svg>

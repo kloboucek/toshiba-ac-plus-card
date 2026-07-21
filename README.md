@@ -1,6 +1,6 @@
 # Toshiba AC Plus Card
 
-![Toshiba AC Plus Card circular thermostat preview](assets/preview-v0.2.2.svg)
+![Toshiba AC Plus Card 0.4.0 beta preview](assets/preview-v0.4.0.svg)
 
 A Home Assistant Lovelace dashboard card for Toshiba AC units exposed through the Toshiba AC Community integration.
 
